@@ -6,6 +6,7 @@ import { StockEvolutionChart } from "@/components/dashboard/StockEvolutionChart"
 import { SalesByHourChart } from "@/components/dashboard/SalesByHourChart";
 import { SalesHeatmap } from "@/components/dashboard/SalesHeatmap";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
+import { CategoryRevenueChart } from "@/components/dashboard/CategoryRevenueChart";
 import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
 import { useDashboardKpis } from "@/hooks/useDashboardData";
 import { useKpiSparklines } from "@/hooks/useKpiSparklines";
@@ -51,8 +52,9 @@ const Dashboard = () => {
         <SalesHeatmap />
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }} className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <SalesByHourChart />
+        <CategoryRevenueChart />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }} className="grid gap-4 grid-cols-1 lg:grid-cols-2">
