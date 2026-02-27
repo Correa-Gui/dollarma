@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useSales, useCancelSale, type Sale } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -21,8 +20,10 @@ import { Search, Eye, XCircle, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const statusLabel: Record<string, string> = { completed: "Concluída", cancelled: "Cancelada", refunded: "Devolvida" };
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  completed: "default", cancelled: "destructive", refunded: "outline",
+const statusColor: Record<string, string> = {
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border-red-200 dark:border-red-800",
+  refunded: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200 dark:border-amber-800",
 };
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -62,22 +63,26 @@ const SalesHistory = () => {
   if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Histórico de Vendas</h1>
-          <p className="text-muted-foreground text-sm">{sales.length} vendas registradas</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{sales.length} vendas registradas</p>
         </div>
-        <Button variant="outline" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Exportar CSV</Button>
+        <Button variant="outline" size="sm" onClick={exportCSV} className="gap-1.5">
+          <Download className="h-4 w-4" /> Exportar CSV
+        </Button>
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por número ou terminal..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Buscar por número ou terminal..." className="pl-9 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="completed">Concluída</SelectItem>
@@ -86,7 +91,7 @@ const SalesHistory = () => {
           </SelectContent>
         </Select>
         <Select value={filterPayment} onValueChange={setFilterPayment}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Pagamento" /></SelectTrigger>
+          <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Pagamento" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="Pix">Pix</SelectItem>
@@ -97,37 +102,50 @@ const SalesHistory = () => {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
+      {/* Table */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Nº</TableHead><TableHead>Data / Hora</TableHead><TableHead>Terminal</TableHead>
-              <TableHead className="text-center">Itens</TableHead><TableHead>Pagamento</TableHead>
-              <TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead>
-              <TableHead className="w-[100px]">Ações</TableHead>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Nº</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Data / Hora</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Terminal</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider text-center">Itens</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Pagamento</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Total</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider w-[90px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell className="font-mono text-xs">#{s.sale_number}</TableCell>
-                <TableCell className="text-xs">{new Date(s.sold_at).toLocaleString("pt-BR")}</TableCell>
-                <TableCell>{s.pdv_terminals?.name ?? s.origin}</TableCell>
-                <TableCell className="text-center">{s.sale_items?.length ?? 0}</TableCell>
-                <TableCell>{s.payment_method}</TableCell>
-                <TableCell className="text-right font-medium">{fmt(Number(s.total))}</TableCell>
-                <TableCell><Badge variant={statusVariant[s.status] ?? "secondary"}>{statusLabel[s.status] ?? s.status}</Badge></TableCell>
+              <TableRow key={s.id} className="group">
+                <TableCell className="font-mono text-xs font-medium">#{s.sale_number}</TableCell>
+                <TableCell className="text-xs tabular-nums">{new Date(s.sold_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{s.pdv_terminals?.name ?? s.origin}</TableCell>
+                <TableCell className="text-center text-sm tabular-nums">{s.sale_items?.length ?? 0}</TableCell>
+                <TableCell className="text-sm">{s.payment_method}</TableCell>
+                <TableCell className="text-right font-semibold text-sm tabular-nums">{fmt(Number(s.total))}</TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setDetailSale(s)}><Eye className="h-3.5 w-3.5" /></Button>
+                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor[s.status] ?? "bg-muted text-muted-foreground border-border"}`}>
+                    {statusLabel[s.status] ?? s.status}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailSale(s)}><Eye className="h-3.5 w-3.5" /></Button>
                     {s.status === "completed" && (
-                      <Button variant="ghost" size="icon" onClick={() => { setCancelTarget(s); setCancelReason(""); setCancelDialogOpen(true); }}><XCircle className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => { setCancelTarget(s); setCancelReason(""); setCancelDialogOpen(true); }}><XCircle className="h-3.5 w-3.5" /></Button>
                     )}
                   </div>
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma venda encontrada</TableCell></TableRow>}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada</TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -143,7 +161,7 @@ const SalesHistory = () => {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-muted-foreground">Origem</p><p className="font-medium">{detailSale.origin}</p></div>
                 <div><p className="text-muted-foreground">Pagamento</p><p className="font-medium">{detailSale.payment_method}</p></div>
-                <div><p className="text-muted-foreground">Status</p><Badge variant={statusVariant[detailSale.status] ?? "secondary"}>{statusLabel[detailSale.status] ?? detailSale.status}</Badge></div>
+                <div><p className="text-muted-foreground">Status</p><span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor[detailSale.status] ?? "bg-muted text-muted-foreground border-border"}`}>{statusLabel[detailSale.status] ?? detailSale.status}</span></div>
               </div>
               {detailSale.cancel_reason && (
                 <div className="rounded-lg bg-destructive/10 p-3 text-sm">
