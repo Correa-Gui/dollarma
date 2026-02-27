@@ -8,6 +8,7 @@ import { SalesHeatmap } from "@/components/dashboard/SalesHeatmap";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { CategoryRevenueChart } from "@/components/dashboard/CategoryRevenueChart";
 import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
+import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
 import { useDashboardKpis } from "@/hooks/useDashboardData";
 import { useKpiSparklines } from "@/hooks/useKpiSparklines";
 import { DollarSign, TrendingUp, ShoppingCart, Receipt, Loader2 } from "lucide-react";
@@ -41,6 +42,10 @@ const Dashboard = () => {
           <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" index={3} sparkline={sparklines?.avgTicket} />
         </div>
       )}
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.45 }}>
+        <InsightsPanel />
+      </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.5 }} className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <div className="lg:col-span-2"><RevenueChart /></div>
