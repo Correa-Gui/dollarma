@@ -1,0 +1,7 @@
+
+UPDATE products SET stock_quantity = 3 WHERE id = 'c1000000-0000-0000-0000-000000000006';
+UPDATE products SET stock_quantity = 5 WHERE id = 'c1000000-0000-0000-0000-000000000010';
+UPDATE products SET stock_quantity = 8 WHERE id = 'c1000000-0000-0000-0000-000000000002';
+UPDATE products SET stock_quantity = 12 WHERE id = 'c1000000-0000-0000-0000-000000000005';
+UPDATE products SET stock_quantity = 2 WHERE id = 'c1000000-0000-0000-0000-000000000007';
+UPDATE products SET stock_quantity = 7 WHERE id = 'c1000000-0000-0000-0000-000000000009';
