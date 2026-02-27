@@ -20,6 +20,9 @@ import TopSelling from "./pages/reports/TopSelling";
 import Profitability from "./pages/reports/Profitability";
 import CashFlow from "./pages/reports/CashFlow";
 import CriticalStock from "./pages/reports/CriticalStock";
+import Seasonality from "./pages/reports/Seasonality";
+import CategoryAnalysis from "./pages/reports/CategoryAnalysis";
+import AbcCurve from "./pages/reports/AbcCurve";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
@@ -62,6 +65,9 @@ const App = () => (
                 <Route path="/relatorios/lucratividade" element={<Profitability />} />
                 <Route path="/relatorios/fluxo-caixa" element={<CashFlow />} />
                 <Route path="/relatorios/estoque-critico" element={<CriticalStock />} />
+                <Route path="/relatorios/sazonalidade" element={<Seasonality />} />
+                <Route path="/relatorios/categorias" element={<CategoryAnalysis />} />
+                <Route path="/relatorios/curva-abc" element={<AbcCurve />} />
                 <Route path="/config/geral" element={<GeneralSettings />} />
                 <Route path="/config/pdv" element={<PdvSettings />} />
                 <Route path="/config/usuarios" element={<UsersSettings />} />
