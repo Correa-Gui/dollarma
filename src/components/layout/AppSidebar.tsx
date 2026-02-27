@@ -1,5 +1,7 @@
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
+  LogOut,
   ShoppingCart,
   Package,
   BarChart3,
@@ -24,6 +26,7 @@ import {
   Store,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { Button } from "@/components/ui/button";
 import { useLocation } from "react-router-dom";
 
 import {
@@ -98,6 +101,7 @@ const menuItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { signOut } = useAuth();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const currentPath = location.pathname;
@@ -187,9 +191,28 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 space-y-2">
         {!collapsed && (
-          <p className="text-xs text-sidebar-foreground/50 text-center">v1.0 — Fase 1</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            onClick={() => signOut()}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sair
+          </Button>
+        )}
+        {collapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mx-auto text-sidebar-foreground/70"
+            onClick={() => signOut()}
+            title="Sair"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         )}
       </SidebarFooter>
     </Sidebar>
