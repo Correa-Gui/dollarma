@@ -19,9 +19,9 @@ export function useStoreSettings() {
         .from("store_settings")
         .select("*")
         .limit(1)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data as StoreSettings;
+      return data as StoreSettings | null;
     },
   });
 }
