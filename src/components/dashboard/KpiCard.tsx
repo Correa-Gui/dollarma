@@ -1,0 +1,50 @@
+import { Card, CardContent } from "@/components/ui/card";
+import { TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface KpiCardProps {
+  title: string;
+  value: number;
+  change: number;
+  icon: LucideIcon;
+  format: "currency" | "number";
+}
+
+export function KpiCard({ title, value, change, icon: Icon, format }: KpiCardProps) {
+  const formatted =
+    format === "currency"
+      ? value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+      : value.toLocaleString("pt-BR");
+
+  const isPositive = change >= 0;
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div className="mt-2">
+          <p className="text-2xl font-bold tracking-tight">{formatted}</p>
+          <div className="mt-1 flex items-center gap-1">
+            {isPositive ? (
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+            )}
+            <span
+              className={cn(
+                "text-xs font-medium",
+                isPositive ? "text-emerald-500" : "text-red-500"
+              )}
+            >
+              {isPositive ? "+" : ""}
+              {change}% vs ontem
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
