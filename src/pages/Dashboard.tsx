@@ -3,7 +3,7 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { PaymentMethodChart } from "@/components/dashboard/PaymentMethodChart";
 import { TopProductsChart } from "@/components/dashboard/TopProductsChart";
 import { StockEvolutionChart } from "@/components/dashboard/StockEvolutionChart";
-import { SalesByHourChart } from "@/components/dashboard/SalesByHourChart";
+
 import { SalesHeatmap } from "@/components/dashboard/SalesHeatmap";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { CategoryRevenueChart } from "@/components/dashboard/CategoryRevenueChart";
@@ -57,8 +57,7 @@ const Dashboard = () => {
         <SalesHeatmap />
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }} className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <SalesByHourChart />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }}>
         <CategoryRevenueChart />
       </motion.div>
 
