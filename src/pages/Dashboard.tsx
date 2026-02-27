@@ -7,7 +7,7 @@ import { StockEvolutionChart } from "@/components/dashboard/StockEvolutionChart"
 import { SalesHeatmap } from "@/components/dashboard/SalesHeatmap";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { CategoryRevenueChart } from "@/components/dashboard/CategoryRevenueChart";
-import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
+
 import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
 import { useDashboardKpis } from "@/hooks/useDashboardData";
 import { useKpiSparklines } from "@/hooks/useKpiSparklines";
@@ -66,9 +66,6 @@ const Dashboard = () => {
         <CriticalStockPanel />
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.95 }}>
-        <PdvStatusPanel />
-      </motion.div>
     </div>
   );
 };
