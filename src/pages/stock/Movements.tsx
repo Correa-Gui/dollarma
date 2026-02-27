@@ -3,7 +3,7 @@ import { useStockMovements, useCreateStockMovement } from "@/hooks/useStockMovem
 import { useProducts } from "@/hooks/useProducts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -22,9 +22,9 @@ const typeLabels: Record<string, string> = {
   adjustment_out: "Ajuste -", refund: "Devolução", transfer: "Transferência",
 };
 
-const typeBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  purchase: "default", sale: "secondary", adjustment_in: "outline",
-  adjustment_out: "destructive", refund: "outline", transfer: "secondary",
+const typeBadgeTone: Record<string, StatusTone> = {
+  purchase: "success", sale: "info", adjustment_in: "purple",
+  adjustment_out: "danger", refund: "warning", transfer: "neutral",
 };
 
 const Movements = () => {
@@ -98,7 +98,7 @@ const Movements = () => {
               <TableRow key={m.id}>
                 <TableCell className="text-xs">{new Date(m.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>
-                  <Badge variant={typeBadgeVariant[m.type] ?? "secondary"}>{typeLabels[m.type] ?? m.type}</Badge>
+                  <StatusBadge tone={typeBadgeTone[m.type] ?? "neutral"}>{typeLabels[m.type] ?? m.type}</StatusBadge>
                 </TableCell>
                 <TableCell className="font-medium">{m.products?.name ?? "—"}</TableCell>
                 <TableCell className="text-right">{m.quantity}</TableCell>

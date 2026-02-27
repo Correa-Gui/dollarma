@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCriticalStockDashboard } from "@/hooks/useDashboardData";
 import { AlertTriangle, ShoppingCart, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export function CriticalStockPanel() {
   const { data: items = [], isLoading } = useCriticalStockDashboard();
@@ -12,7 +12,7 @@ export function CriticalStockPanel() {
       <CardHeader className="pb-2 flex flex-row items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-amber-500" />
         <CardTitle className="text-base">Estoque Crítico</CardTitle>
-        <Badge variant="destructive" className="ml-auto">{items.length}</Badge>
+        <StatusBadge tone="danger" className="ml-auto">{items.length}</StatusBadge>
       </CardHeader>
       <CardContent>
         {isLoading ? (

@@ -78,7 +78,9 @@ const PdvSettings = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className={`h-2 w-2 rounded-full ${t.status === "online" ? "bg-emerald-500" : "bg-red-500"}`} />
-                          {t.status === "online" ? "Online" : "Offline"}
+                          <span className={`text-xs font-medium ${t.status === "online" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {t.status === "online" ? "Online" : "Offline"}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{formatLastSync(t.last_sync)}</TableCell>
