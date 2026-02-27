@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { mockSales, mockRefunds, type MockSale, type MockRefund } from "@/data/mock-sales-data";
+import { useSales, type Sale } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -12,163 +11,115 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, RotateCcw } from "lucide-react";
+import { Plus, Search, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+
+const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const Refunds = () => {
-  const [refunds, setRefunds] = useState<MockRefund[]>(mockRefunds);
+  const { data: allSales = [], isLoading } = useSales();
+  const qc = useQueryClient();
+
+  const refundedSales = allSales.filter((s) => s.status === "refunded");
+  const completedSales = allSales.filter((s) => s.status === "completed");
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchSale, setSearchSale] = useState("");
-  const [selectedSale, setSelectedSale] = useState<MockSale | null>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const completedSales = mockSales.filter((s) => s.status === "completed");
-
-  const filteredSales = completedSales.filter(
-    (s) =>
-      String(s.number).includes(searchSale) ||
-      s.items.some((it) => it.productName.toLowerCase().includes(searchSale.toLowerCase()))
+  const filteredSales = completedSales.filter((s) =>
+    String(s.sale_number).includes(searchSale) ||
+    s.sale_items?.some((it) => it.product_name.toLowerCase().includes(searchSale.toLowerCase()))
   );
 
-  const openNew = () => {
-    setSelectedSale(null);
-    setSelectedItems({});
-    setReason("");
-    setSearchSale("");
-    setDialogOpen(true);
+  const openNew = () => { setSelectedSale(null); setSelectedItems({}); setReason(""); setSearchSale(""); setDialogOpen(true); };
+  const toggleItem = (itemId: string) => setSelectedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
+
+  const confirmRefund = async () => {
+    if (!selectedSale || !reason.trim()) return;
+    const itemsToRefund = selectedSale.sale_items?.filter((it) => selectedItems[it.id]) ?? [];
+    if (itemsToRefund.length === 0) { toast.error("Selecione ao menos um item"); return; }
+
+    setSubmitting(true);
+    try {
+      await supabase.from("sales").update({ status: "refunded", cancel_reason: reason }).eq("id", selectedSale.id);
+      // Restock products
+      for (const item of itemsToRefund) {
+        const { data: product } = await supabase.from("products").select("stock_quantity").eq("id", item.product_id).single();
+        const prevQty = product?.stock_quantity ?? 0;
+        const newQty = prevQty + item.quantity;
+        await supabase.from("products").update({ stock_quantity: newQty }).eq("id", item.product_id);
+        await supabase.from("stock_movements").insert({
+          product_id: item.product_id, type: "refund", quantity: item.quantity,
+          previous_qty: prevQty, new_qty: newQty, reason, origin: "devolucao",
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["stock_movements"] });
+      toast.success("Devolução registrada — estoque reposto");
+      setDialogOpen(false);
+    } catch (e: any) {
+      toast.error(`Erro: ${e.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const toggleItem = (itemId: string) => {
-    setSelectedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
-  };
-
-  const confirmRefund = () => {
-    if (!selectedSale) {
-      toast.error("Selecione uma venda");
-      return;
-    }
-    if (!reason.trim()) {
-      toast.error("Motivo é obrigatório");
-      return;
-    }
-    const itemsToRefund = selectedSale.items.filter((it) => selectedItems[it.id]);
-    if (itemsToRefund.length === 0) {
-      toast.error("Selecione ao menos um item");
-      return;
-    }
-
-    const totalRefunded = +itemsToRefund.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2);
-    const newRefund: MockRefund = {
-      id: `ref-${Date.now()}`,
-      saleId: selectedSale.id,
-      saleNumber: selectedSale.number,
-      date: new Date().toLocaleDateString("pt-BR"),
-      reason,
-      items: itemsToRefund.map((it) => ({
-        productName: it.productName,
-        quantity: it.quantity,
-        subtotal: it.subtotal,
-      })),
-      totalRefunded,
-      createdBy: "Admin",
-    };
-
-    setRefunds((prev) => [newRefund, ...prev]);
-    setDialogOpen(false);
-    toast.success("Devolução registrada — estoque reposto automaticamente");
-  };
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Devoluções</h1>
-          <p className="text-muted-foreground text-sm">{refunds.length} devoluções registradas</p>
+          <p className="text-muted-foreground text-sm">{refundedSales.length} devoluções registradas</p>
         </div>
-        <Button onClick={openNew}>
-          <Plus className="h-4 w-4 mr-1" /> Nova Devolução
-        </Button>
+        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova Devolução</Button>
       </div>
 
-      {/* Refunds table */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Venda Nº</TableHead>
-              <TableHead>Motivo</TableHead>
-              <TableHead>Itens</TableHead>
-              <TableHead className="text-right">Valor Devolvido</TableHead>
-              <TableHead>Responsável</TableHead>
+              <TableHead>Data</TableHead><TableHead>Venda Nº</TableHead><TableHead>Motivo</TableHead>
+              <TableHead>Itens</TableHead><TableHead className="text-right">Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {refunds.map((r) => (
+            {refundedSales.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="text-xs">{r.date}</TableCell>
-                <TableCell className="font-mono text-xs">#{r.saleNumber}</TableCell>
-                <TableCell>{r.reason}</TableCell>
-                <TableCell>
-                  {r.items.map((it) => (
-                    <span key={it.productName} className="text-xs block">
-                      {it.productName} × {it.quantity}
-                    </span>
-                  ))}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {r.totalRefunded.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </TableCell>
-                <TableCell>{r.createdBy}</TableCell>
+                <TableCell className="text-xs">{new Date(r.sold_at).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="font-mono text-xs">#{r.sale_number}</TableCell>
+                <TableCell>{r.cancel_reason ?? "—"}</TableCell>
+                <TableCell>{r.sale_items?.map((it) => <span key={it.id} className="text-xs block">{it.product_name} × {it.quantity}</span>)}</TableCell>
+                <TableCell className="text-right font-medium">{fmt(Number(r.total))}</TableCell>
               </TableRow>
             ))}
-            {refunds.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhuma devolução registrada
-                </TableCell>
-              </TableRow>
-            )}
+            {refundedSales.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhuma devolução registrada</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
 
-      {/* New Refund Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nova Devolução</DialogTitle>
-            <DialogDescription>Selecione a venda original e os itens a serem devolvidos</DialogDescription>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Nova Devolução</DialogTitle><DialogDescription>Selecione a venda original e os itens a serem devolvidos</DialogDescription></DialogHeader>
           {!selectedSale ? (
             <div className="space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar venda por número ou produto..."
-                  className="pl-9"
-                  value={searchSale}
-                  onChange={(e) => setSearchSale(e.target.value)}
-                />
+                <Input placeholder="Buscar venda por número ou produto..." className="pl-9" value={searchSale} onChange={(e) => setSearchSale(e.target.value)} />
               </div>
               <div className="max-h-[300px] overflow-y-auto space-y-2">
                 {filteredSales.slice(0, 10).map((s) => (
-                  <button
-                    key={s.id}
-                    className="w-full flex items-center justify-between rounded-lg border p-3 hover:bg-accent text-left transition-colors"
-                    onClick={() => setSelectedSale(s)}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">Venda #{s.number}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {s.soldAt} — {s.items.length} itens — {s.paymentMethod}
-                      </p>
-                    </div>
-                    <p className="font-semibold">
-                      {s.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                    </p>
+                  <button key={s.id} className="w-full flex items-center justify-between rounded-lg border p-3 hover:bg-accent text-left transition-colors" onClick={() => setSelectedSale(s)}>
+                    <div><p className="font-medium text-sm">Venda #{s.sale_number}</p><p className="text-xs text-muted-foreground">{new Date(s.sold_at).toLocaleString("pt-BR")} — {s.sale_items?.length ?? 0} itens — {s.payment_method}</p></div>
+                    <p className="font-semibold">{fmt(Number(s.total))}</p>
                   </button>
                 ))}
               </div>
@@ -176,56 +127,31 @@ const Refunds = () => {
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between rounded-lg bg-muted p-3">
-                <div>
-                  <p className="font-medium">Venda #{selectedSale.number}</p>
-                  <p className="text-xs text-muted-foreground">{selectedSale.soldAt}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setSelectedSale(null)}>
-                  Trocar
-                </Button>
+                <div><p className="font-medium">Venda #{selectedSale.sale_number}</p><p className="text-xs text-muted-foreground">{new Date(selectedSale.sold_at).toLocaleString("pt-BR")}</p></div>
+                <Button variant="outline" size="sm" onClick={() => setSelectedSale(null)}>Trocar</Button>
               </div>
-
               <div>
                 <Label className="mb-2 block">Selecione os itens para devolução</Label>
                 <div className="space-y-2">
-                  {selectedSale.items.map((it) => (
-                    <label
-                      key={it.id}
-                      className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors"
-                    >
-                      <Checkbox
-                        checked={!!selectedItems[it.id]}
-                        onCheckedChange={() => toggleItem(it.id)}
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{it.productName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {it.quantity} × {it.unitPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                        </p>
-                      </div>
-                      <p className="font-medium text-sm">
-                        {it.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                      </p>
+                  {selectedSale.sale_items?.map((it) => (
+                    <label key={it.id} className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-accent transition-colors">
+                      <Checkbox checked={!!selectedItems[it.id]} onCheckedChange={() => toggleItem(it.id)} />
+                      <div className="flex-1"><p className="text-sm font-medium">{it.product_name}</p><p className="text-xs text-muted-foreground">{it.quantity} × {fmt(Number(it.unit_price))}</p></div>
+                      <p className="font-medium text-sm">{fmt(Number(it.subtotal))}</p>
                     </label>
                   ))}
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label>Motivo da devolução *</Label>
-                <Textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Produto com defeito, troca, arrependimento..."
-                />
+                <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Produto com defeito, troca, arrependimento..." />
               </div>
             </div>
           )}
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             {selectedSale && (
-              <Button onClick={confirmRefund}>
+              <Button onClick={confirmRefund} disabled={submitting}>
                 <RotateCcw className="h-4 w-4 mr-1" /> Confirmar Devolução
               </Button>
             )}

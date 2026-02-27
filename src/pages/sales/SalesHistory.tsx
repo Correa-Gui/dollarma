@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { mockSales, type MockSale } from "@/data/mock-sales-data";
+import { useSales, useCancelSale, type Sale } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,76 +17,49 @@ import {
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Eye, XCircle, Download } from "lucide-react";
+import { Search, Eye, XCircle, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const statusLabel: Record<MockSale["status"], string> = {
-  completed: "Concluída",
-  cancelled: "Cancelada",
-  refunded: "Devolvida",
+const statusLabel: Record<string, string> = { completed: "Concluída", cancelled: "Cancelada", refunded: "Devolvida" };
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  completed: "default", cancelled: "destructive", refunded: "outline",
 };
-
-const statusVariant: Record<MockSale["status"], "default" | "secondary" | "destructive" | "outline"> = {
-  completed: "default",
-  cancelled: "destructive",
-  refunded: "outline",
-};
+const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const SalesHistory = () => {
-  const [sales, setSales] = useState<MockSale[]>(mockSales);
+  const { data: sales = [], isLoading } = useSales();
+  const cancelSale = useCancelSale();
+
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPayment, setFilterPayment] = useState("all");
-  const [detailSale, setDetailSale] = useState<MockSale | null>(null);
+  const [detailSale, setDetailSale] = useState<Sale | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState<MockSale | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
   const [cancelReason, setCancelReason] = useState("");
 
   const filtered = sales.filter((s) => {
-    const matchSearch =
-      String(s.number).includes(search) ||
-      s.terminal.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = String(s.sale_number).includes(search) || (s.pdv_terminals?.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || s.status === filterStatus;
-    const matchPayment = filterPayment === "all" || s.paymentMethod === filterPayment;
+    const matchPayment = filterPayment === "all" || s.payment_method === filterPayment;
     return matchSearch && matchStatus && matchPayment;
   });
 
-  const openCancel = (s: MockSale) => {
-    setCancelTarget(s);
-    setCancelReason("");
-    setCancelDialogOpen(true);
-  };
-
-  const confirmCancel = () => {
-    if (!cancelReason.trim()) {
-      toast.error("Motivo é obrigatório");
-      return;
-    }
-    setSales((prev) =>
-      prev.map((s) =>
-        s.id === cancelTarget?.id
-          ? { ...s, status: "cancelled" as const, cancelReason }
-          : s
-      )
-    );
+  const confirmCancel = async () => {
+    if (!cancelReason.trim() || !cancelTarget) return;
+    await cancelSale.mutateAsync({ id: cancelTarget.id, reason: cancelReason });
     setCancelDialogOpen(false);
-    toast.success("Venda cancelada com sucesso");
   };
 
   const exportCSV = () => {
     const header = "Nº,Data,Terminal,Pagamento,Total,Status\n";
-    const rows = filtered
-      .map((s) => `${s.number},${s.soldAt},${s.terminal},${s.paymentMethod},${s.total},${statusLabel[s.status]}`)
-      .join("\n");
+    const rows = filtered.map((s) => `${s.sale_number},${new Date(s.sold_at).toLocaleString("pt-BR")},${s.pdv_terminals?.name ?? s.origin},${s.payment_method},${s.total},${statusLabel[s.status] ?? s.status}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "vendas.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "vendas.csv"; a.click();
     toast.success("CSV exportado");
   };
+
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="space-y-4">
@@ -95,26 +68,16 @@ const SalesHistory = () => {
           <h1 className="text-2xl font-bold tracking-tight">Histórico de Vendas</h1>
           <p className="text-muted-foreground text-sm">{sales.length} vendas registradas</p>
         </div>
-        <Button variant="outline" onClick={exportCSV}>
-          <Download className="h-4 w-4 mr-1" /> Exportar CSV
-        </Button>
+        <Button variant="outline" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Exportar CSV</Button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por número ou terminal..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Buscar por número ou terminal..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="completed">Concluída</SelectItem>
@@ -123,9 +86,7 @@ const SalesHistory = () => {
           </SelectContent>
         </Select>
         <Select value={filterPayment} onValueChange={setFilterPayment}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Pagamento" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Pagamento" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="Pix">Pix</SelectItem>
@@ -136,155 +97,97 @@ const SalesHistory = () => {
         </Select>
       </div>
 
-      {/* Table */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nº</TableHead>
-              <TableHead>Data / Hora</TableHead>
-              <TableHead>Terminal</TableHead>
-              <TableHead className="text-center">Itens</TableHead>
-              <TableHead>Pagamento</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Nº</TableHead><TableHead>Data / Hora</TableHead><TableHead>Terminal</TableHead>
+              <TableHead className="text-center">Itens</TableHead><TableHead>Pagamento</TableHead>
+              <TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead>
               <TableHead className="w-[100px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((s) => (
               <TableRow key={s.id}>
-                <TableCell className="font-mono text-xs">#{s.number}</TableCell>
-                <TableCell className="text-xs">{s.soldAt}</TableCell>
-                <TableCell>{s.terminal}</TableCell>
-                <TableCell className="text-center">{s.items.length}</TableCell>
-                <TableCell>{s.paymentMethod}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {s.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={statusVariant[s.status]}>{statusLabel[s.status]}</Badge>
-                </TableCell>
+                <TableCell className="font-mono text-xs">#{s.sale_number}</TableCell>
+                <TableCell className="text-xs">{new Date(s.sold_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell>{s.pdv_terminals?.name ?? s.origin}</TableCell>
+                <TableCell className="text-center">{s.sale_items?.length ?? 0}</TableCell>
+                <TableCell>{s.payment_method}</TableCell>
+                <TableCell className="text-right font-medium">{fmt(Number(s.total))}</TableCell>
+                <TableCell><Badge variant={statusVariant[s.status] ?? "secondary"}>{statusLabel[s.status] ?? s.status}</Badge></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setDetailSale(s)}>
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setDetailSale(s)}><Eye className="h-3.5 w-3.5" /></Button>
                     {s.status === "completed" && (
-                      <Button variant="ghost" size="icon" onClick={() => openCancel(s)}>
-                        <XCircle className="h-3.5 w-3.5" />
-                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setCancelTarget(s); setCancelReason(""); setCancelDialogOpen(true); }}><XCircle className="h-3.5 w-3.5" /></Button>
                     )}
                   </div>
                 </TableCell>
               </TableRow>
             ))}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Nenhuma venda encontrada
-                </TableCell>
-              </TableRow>
-            )}
+            {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhuma venda encontrada</TableCell></TableRow>}
           </TableBody>
         </Table>
       </div>
 
-      {/* Detail Sheet */}
       <Sheet open={!!detailSale} onOpenChange={() => setDetailSale(null)}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Venda #{detailSale?.number}</SheetTitle>
-            <SheetDescription>{detailSale?.soldAt} — {detailSale?.terminal}</SheetDescription>
+            <SheetTitle>Venda #{detailSale?.sale_number}</SheetTitle>
+            <SheetDescription>{detailSale && new Date(detailSale.sold_at).toLocaleString("pt-BR")} — {detailSale?.pdv_terminals?.name ?? detailSale?.origin}</SheetDescription>
           </SheetHeader>
           {detailSale && (
             <div className="mt-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Origem</p>
-                  <p className="font-medium">{detailSale.origin === "pdv" ? "PDV" : "Web"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Pagamento</p>
-                  <p className="font-medium">{detailSale.paymentMethod}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Status</p>
-                  <Badge variant={statusVariant[detailSale.status]}>
-                    {statusLabel[detailSale.status]}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Operador</p>
-                  <p className="font-medium">{detailSale.createdBy}</p>
-                </div>
+                <div><p className="text-muted-foreground">Origem</p><p className="font-medium">{detailSale.origin}</p></div>
+                <div><p className="text-muted-foreground">Pagamento</p><p className="font-medium">{detailSale.payment_method}</p></div>
+                <div><p className="text-muted-foreground">Status</p><Badge variant={statusVariant[detailSale.status] ?? "secondary"}>{statusLabel[detailSale.status] ?? detailSale.status}</Badge></div>
               </div>
-
-              {detailSale.cancelReason && (
+              {detailSale.cancel_reason && (
                 <div className="rounded-lg bg-destructive/10 p-3 text-sm">
                   <p className="font-medium text-destructive">Motivo do cancelamento:</p>
-                  <p>{detailSale.cancelReason}</p>
+                  <p>{detailSale.cancel_reason}</p>
                 </div>
               )}
-
               <div>
                 <h4 className="text-sm font-medium mb-2">Itens</h4>
                 <div className="rounded-lg border">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Produto</TableHead>
-                        <TableHead className="text-right">Qtd</TableHead>
-                        <TableHead className="text-right">Unit.</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                    <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead className="text-right">Qtd</TableHead><TableHead className="text-right">Unit.</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {detailSale.items.map((it) => (
+                      {detailSale.sale_items?.map((it) => (
                         <TableRow key={it.id}>
-                          <TableCell className="text-sm">{it.productName}</TableCell>
+                          <TableCell className="text-sm">{it.product_name}</TableCell>
                           <TableCell className="text-right">{it.quantity}</TableCell>
-                          <TableCell className="text-right">
-                            {it.unitPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {it.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                          </TableCell>
+                          <TableCell className="text-right">{fmt(Number(it.unit_price))}</TableCell>
+                          <TableCell className="text-right font-medium">{fmt(Number(it.subtotal))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               </div>
-
-              <div className="flex justify-end text-lg font-bold">
-                Total: {detailSale.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
+              <div className="flex justify-end text-lg font-bold">Total: {fmt(Number(detailSale.total))}</div>
             </div>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancelar Venda #{cancelTarget?.number}</DialogTitle>
-            <DialogDescription>
-              Esta ação irá estornar o estoque dos produtos vendidos.
-            </DialogDescription>
+            <DialogTitle>Cancelar Venda #{cancelTarget?.sale_number}</DialogTitle>
+            <DialogDescription>Esta ação irá estornar o estoque dos produtos vendidos.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Motivo do cancelamento *</Label>
-            <Textarea
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Informe o motivo..."
-            />
+            <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Informe o motivo..." />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Voltar</Button>
-            <Button variant="destructive" onClick={confirmCancel}>Confirmar Cancelamento</Button>
+            <Button variant="destructive" onClick={confirmCancel} disabled={cancelSale.isPending}>Confirmar Cancelamento</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
