@@ -24,6 +24,7 @@ import GeneralSettings from "./pages/settings/GeneralSettings";
 import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
 import PlanoContas from "./pages/settings/PlanoContas";
+import ApiDocs from "./pages/settings/ApiDocs";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -65,6 +66,7 @@ const App = () => (
                 <Route path="/config/pdv" element={<PdvSettings />} />
                 <Route path="/config/usuarios" element={<UsersSettings />} />
                 <Route path="/config/plano-contas" element={<PlanoContas />} />
+                <Route path="/config/api-docs" element={<ApiDocs />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
