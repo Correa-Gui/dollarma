@@ -14,6 +14,146 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parent_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parent_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pdv_terminals: {
+        Row: {
+          created_at: string
+          id: string
+          last_sync: string | null
+          name: string
+          status: string
+          sync_interval_min: number
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_sync?: string | null
+          name: string
+          status?: string
+          sync_interval_min?: number
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_sync?: string | null
+          name?: string
+          status?: string
+          sync_interval_min?: number
+          token?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          barcode: string | null
+          category_id: string | null
+          cost_price: number
+          created_at: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          min_stock: number
+          name: string
+          promo_end: string | null
+          promo_price: number | null
+          promo_start: string | null
+          sale_price: number
+          sku: string
+          stock_quantity: number
+          supplier_id: string | null
+          tags: string[] | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          category_id?: string | null
+          cost_price?: number
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          min_stock?: number
+          name: string
+          promo_end?: string | null
+          promo_price?: number | null
+          promo_start?: string | null
+          sale_price?: number
+          sku: string
+          stock_quantity?: number
+          supplier_id?: string | null
+          tags?: string[] | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          category_id?: string | null
+          cost_price?: number
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          min_stock?: number
+          name?: string
+          promo_end?: string | null
+          promo_price?: number | null
+          promo_start?: string | null
+          sale_price?: number
+          sku?: string
+          stock_quantity?: number
+          supplier_id?: string | null
+          tags?: string[] | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +178,184 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      sale_items: {
+        Row: {
+          id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          sale_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          product_name: string
+          quantity?: number
+          sale_id: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          sale_id?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          cancel_reason: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          origin: string
+          payment_method: string
+          sale_number: number
+          sold_at: string
+          status: string
+          terminal_id: string | null
+          total: number
+        }
+        Insert: {
+          cancel_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          origin?: string
+          payment_method?: string
+          sale_number?: number
+          sold_at?: string
+          status?: string
+          terminal_id?: string | null
+          total?: number
+        }
+        Update: {
+          cancel_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          origin?: string
+          payment_method?: string
+          sale_number?: number
+          sold_at?: string
+          status?: string
+          terminal_id?: string | null
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "pdv_terminals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          new_qty: number
+          origin: string | null
+          previous_qty: number
+          product_id: string
+          quantity: number
+          reason: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_qty?: number
+          origin?: string | null
+          previous_qty?: number
+          product_id: string
+          quantity: number
+          reason?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_qty?: number
+          origin?: string | null
+          previous_qty?: number
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          avg_delivery_days: number | null
+          cnpj: string | null
+          contact: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          avg_delivery_days?: number | null
+          cnpj?: string | null
+          contact?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          avg_delivery_days?: number | null
+          cnpj?: string | null
+          contact?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
         }
         Relationships: []
       }
