@@ -51,6 +51,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 
 const menuItems = [
   {
@@ -114,21 +115,34 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <Store className="h-6 w-6 text-sidebar-primary" />
+      <SidebarHeader className="p-4 pb-2">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Store className="h-4 w-4" />
+          </div>
           {!collapsed && (
-            <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
-              GestãoLoja
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-sidebar-foreground tracking-tight leading-none">
+                GestãoLoja
+              </span>
+              <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
+                Painel de Controle
+              </span>
+            </div>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      {!collapsed && (
+        <div className="px-4 py-1">
+          <Separator className="bg-sidebar-border" />
+        </div>
+      )}
+
+      <SidebarContent className="px-2 pt-1">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
               {menuItems.map((item) =>
                 item.children ? (
                   <Collapsible
@@ -140,29 +154,38 @@ export function AppSidebar() {
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton
                           tooltip={item.title}
-                          className={
-                            isGroupActive(item.children)
-                              ? "text-sidebar-primary font-medium"
-                              : ""
-                          }
+                          className={`
+                            rounded-md transition-all duration-200 ease-out
+                            hover:bg-sidebar-accent/60 hover:translate-x-0.5
+                            ${isGroupActive(item.children)
+                              ? "text-sidebar-primary font-semibold bg-sidebar-accent/40"
+                              : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                            }
+                          `}
                         >
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="text-[13px]">{item.title}</span>
+                          <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-50 transition-transform duration-300 ease-out group-data-[state=open]/collapsible:rotate-180" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
+                      <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
+                        <SidebarMenuSub className="ml-3.5 border-l border-sidebar-border/60 pl-0">
                           {item.children.map((child) => (
                             <SidebarMenuSubItem key={child.title}>
                               <SidebarMenuSubButton asChild>
                                 <NavLink
                                   to={child.url}
                                   end
-                                  className="hover:bg-sidebar-accent"
-                                  activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                                  className="
+                                    rounded-md pl-3 transition-all duration-200 ease-out text-[12.5px]
+                                    text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:translate-x-0.5
+                                  "
+                                  activeClassName="
+                                    bg-sidebar-accent text-sidebar-accent-foreground font-medium
+                                    shadow-[inset_2px_0_0_0_hsl(var(--sidebar-primary))]
+                                  "
                                 >
-                                  <child.icon className="h-3.5 w-3.5 mr-2" />
+                                  <child.icon className="h-3.5 w-3.5 mr-2 shrink-0" />
                                   <span>{child.title}</span>
                                 </NavLink>
                               </SidebarMenuSubButton>
@@ -178,10 +201,16 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url!}
                         end
-                        className="hover:bg-sidebar-accent"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        className="
+                          rounded-md transition-all duration-200 ease-out text-[13px]
+                          text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 hover:translate-x-0.5
+                        "
+                        activeClassName="
+                          bg-sidebar-accent text-sidebar-accent-foreground font-semibold
+                          shadow-[inset_3px_0_0_0_hsl(var(--sidebar-primary))]
+                        "
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className="h-4 w-4 shrink-0" />
                         <span>{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
@@ -193,29 +222,26 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3 space-y-2">
+      <SidebarFooter className="p-3">
         {!collapsed && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
-            onClick={() => signOut()}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
-          </Button>
+          <div className="px-1 pb-1">
+            <Separator className="bg-sidebar-border" />
+          </div>
         )}
-        {collapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mx-auto text-sidebar-foreground/70"
-            onClick={() => signOut()}
-            title="Sair"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon" : "sm"}
+          className={`
+            transition-all duration-200 ease-out rounded-md
+            text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/10
+            ${collapsed ? "mx-auto" : "w-full justify-start"}
+          `}
+          onClick={() => signOut()}
+          title="Sair"
+        >
+          <LogOut className={`h-4 w-4 ${collapsed ? "" : "mr-2"}`} />
+          {!collapsed && <span className="text-[13px]">Sair</span>}
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );
