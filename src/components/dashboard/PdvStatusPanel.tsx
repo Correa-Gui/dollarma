@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePdvTerminals } from "@/hooks/useDashboardData";
 import { MonitorSmartphone, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export function PdvStatusPanel() {
   const { data: terminals = [], isLoading } = usePdvTerminals();
@@ -26,7 +26,7 @@ export function PdvStatusPanel() {
                   <p className="text-sm font-medium truncate">{t.name}</p>
                   <p className="text-xs text-muted-foreground">Sinc: {t.lastSync}</p>
                 </div>
-                {t.pendingSales > 0 && <Badge variant="secondary">{t.pendingSales} pendentes</Badge>}
+                {t.pendingSales > 0 && <StatusBadge tone="warning">{t.pendingSales} pendentes</StatusBadge>}
               </div>
             ))}
           </div>

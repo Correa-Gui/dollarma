@@ -3,7 +3,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCreateStockMovement } from "@/hooks/useStockMovements";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -21,8 +21,8 @@ type InventoryItem = {
 };
 
 const statusLabel = { pending: "Pendente", counted: "Contado", adjusted: "Ajustado" };
-const statusVariant: Record<string, "default" | "secondary" | "outline"> = {
-  pending: "secondary", counted: "outline", adjusted: "default",
+const statusTone: Record<string, StatusTone> = {
+  pending: "warning", counted: "info", adjusted: "success",
 };
 
 const Inventory = () => {
@@ -165,10 +165,10 @@ const Inventory = () => {
                   ) : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant[item.status]}>
-                    {item.status === "adjusted" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                  <StatusBadge tone={statusTone[item.status]}>
+                    {item.status === "adjusted" && <CheckCircle2 className="h-3 w-3" />}
                     {statusLabel[item.status]}
-                  </Badge>
+                  </StatusBadge>
                 </TableCell>
               </TableRow>
             ))}

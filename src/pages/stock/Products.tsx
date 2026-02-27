@@ -4,7 +4,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -148,7 +148,7 @@ const Products = () => {
                   <TableCell className="text-right">
                     <span className={p.stock_quantity <= p.min_stock ? "text-destructive font-semibold" : ""}>{p.stock_quantity}</span>
                   </TableCell>
-                  <TableCell><Badge variant={p.is_active ? "default" : "secondary"}>{p.is_active ? "Ativo" : "Inativo"}</Badge></TableCell>
+                  <TableCell><StatusBadge tone={p.is_active ? "success" : "neutral"}>{p.is_active ? "Ativo" : "Inativo"}</StatusBadge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
