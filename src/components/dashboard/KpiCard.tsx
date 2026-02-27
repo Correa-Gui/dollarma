@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface KpiCardProps {
   title: string;
@@ -8,9 +9,10 @@ interface KpiCardProps {
   change: number;
   icon: LucideIcon;
   format: "currency" | "number";
+  index?: number;
 }
 
-export function KpiCard({ title, value, change, icon: Icon, format }: KpiCardProps) {
+export function KpiCard({ title, value, change, icon: Icon, format, index = 0 }: KpiCardProps) {
   const formatted =
     format === "currency"
       ? value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -19,6 +21,11 @@ export function KpiCard({ title, value, change, icon: Icon, format }: KpiCardPro
   const isPositive = change >= 0;
 
   return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
+    >
     <Card>
       <CardContent className="p-5">
         <div className="flex items-center justify-between">
@@ -46,5 +53,6 @@ export function KpiCard({ title, value, change, icon: Icon, format }: KpiCardPro
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }

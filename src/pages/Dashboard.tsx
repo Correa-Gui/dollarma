@@ -8,6 +8,7 @@ import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
 import { useDashboardKpis } from "@/hooks/useDashboardData";
 import { DollarSign, TrendingUp, ShoppingCart, Receipt, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 const Dashboard = () => {
   const { data: kpis, isLoading } = useDashboardKpis();
@@ -30,29 +31,31 @@ const Dashboard = () => {
         <div className="flex items-center justify-center h-32"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="Faturamento Hoje" value={kpiData.revenueToday.value} change={kpiData.revenueToday.change} icon={DollarSign} format="currency" />
-          <KpiCard title="Faturamento do Mês" value={kpiData.revenueMonth.value} change={kpiData.revenueMonth.change} icon={TrendingUp} format="currency" />
-          <KpiCard title="Vendas Hoje" value={kpiData.salesToday.value} change={kpiData.salesToday.change} icon={ShoppingCart} format="number" />
-          <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" />
+          <KpiCard title="Faturamento Hoje" value={kpiData.revenueToday.value} change={kpiData.revenueToday.change} icon={DollarSign} format="currency" index={0} />
+          <KpiCard title="Faturamento do Mês" value={kpiData.revenueMonth.value} change={kpiData.revenueMonth.change} icon={TrendingUp} format="currency" index={1} />
+          <KpiCard title="Vendas Hoje" value={kpiData.salesToday.value} change={kpiData.salesToday.change} icon={ShoppingCart} format="number" index={2} />
+          <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" index={3} />
         </div>
       )}
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.5 }} className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <div className="lg:col-span-2"><RevenueChart /></div>
         <PaymentMethodChart />
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.65 }} className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <TopProductsChart />
         <SalesByHourChart />
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.8 }} className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <StockEvolutionChart />
         <CriticalStockPanel />
-      </div>
+      </motion.div>
 
-      <PdvStatusPanel />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.95 }}>
+        <PdvStatusPanel />
+      </motion.div>
     </div>
   );
 };
