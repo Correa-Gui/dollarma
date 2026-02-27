@@ -25,6 +25,9 @@ import {
   FileText,
   Store,
   BookOpen,
+  CalendarRange,
+  PieChart,
+  BarChart2,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -87,6 +90,9 @@ const menuItems = [
       { title: "Lucratividade", url: "/relatorios/lucratividade", icon: DollarSign },
       { title: "Fluxo de Caixa", url: "/relatorios/fluxo-caixa", icon: Wallet },
       { title: "Estoque Crítico", url: "/relatorios/estoque-critico", icon: AlertTriangle },
+      { title: "Sazonalidade", url: "/relatorios/sazonalidade", icon: CalendarRange },
+      { title: "Categorias", url: "/relatorios/categorias", icon: PieChart },
+      { title: "Curva ABC", url: "/relatorios/curva-abc", icon: BarChart2 },
     ],
   },
   {
