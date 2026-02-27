@@ -78,7 +78,7 @@ const Auth = () => {
 
   if (showForgot) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <main className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <Store className="h-10 w-10 mx-auto text-primary mb-2" />
@@ -88,8 +88,8 @@ const Auth = () => {
           <form onSubmit={handleForgotPassword}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
+                <Label htmlFor="forgot-email">E-mail</Label>
+                <Input id="forgot-email" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-2">
@@ -103,12 +103,12 @@ const Auth = () => {
             </CardFooter>
           </form>
         </Card>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <main className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Store className="h-10 w-10 mx-auto text-primary mb-2" />
@@ -125,12 +125,12 @@ const Auth = () => {
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
+                  <Label htmlFor="login-email">E-mail</Label>
+                  <Input id="login-email" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Senha</Label>
-                  <Input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
+                  <Label htmlFor="login-password">Senha</Label>
+                  <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
@@ -149,16 +149,16 @@ const Auth = () => {
             <form onSubmit={handleSignup}>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input value={signupName} onChange={(e) => setSignupName(e.target.value)} required />
+                  <Label htmlFor="signup-name">Nome</Label>
+                  <Input id="signup-name" value={signupName} onChange={(e) => setSignupName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
+                  <Label htmlFor="signup-email">E-mail</Label>
+                  <Input id="signup-email" type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Senha</Label>
-                  <Input type="password" minLength={6} value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
+                  <Label htmlFor="signup-password">Senha</Label>
+                  <Input id="signup-password" type="password" minLength={6} value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
                 </div>
               </CardContent>
               <CardFooter>
@@ -171,7 +171,7 @@ const Auth = () => {
           </TabsContent>
         </Tabs>
       </Card>
-    </div>
+    </main>
   );
 };
 
