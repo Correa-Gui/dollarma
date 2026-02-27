@@ -13,6 +13,11 @@ import Movements from "./pages/stock/Movements";
 import Inventory from "./pages/stock/Inventory";
 import SalesHistory from "./pages/sales/SalesHistory";
 import Refunds from "./pages/sales/Refunds";
+import SalesByPeriod from "./pages/reports/SalesByPeriod";
+import TopSelling from "./pages/reports/TopSelling";
+import Profitability from "./pages/reports/Profitability";
+import CashFlow from "./pages/reports/CashFlow";
+import CriticalStock from "./pages/reports/CriticalStock";
 import ComingSoon from "./pages/ComingSoon";
 import NotFound from "./pages/NotFound";
 
@@ -38,11 +43,11 @@ const App = () => (
               <Route path="/vendas/historico" element={<SalesHistory />} />
               <Route path="/vendas/devolucoes" element={<Refunds />} />
               {/* Relatórios */}
-              <Route path="/relatorios/vendas" element={<ComingSoon title="Vendas por Período — Em Breve" />} />
-              <Route path="/relatorios/mais-vendidos" element={<ComingSoon title="Mais Vendidos — Em Breve" />} />
-              <Route path="/relatorios/lucratividade" element={<ComingSoon title="Lucratividade — Em Breve" />} />
-              <Route path="/relatorios/fluxo-caixa" element={<ComingSoon title="Fluxo de Caixa — Em Breve" />} />
-              <Route path="/relatorios/estoque-critico" element={<ComingSoon title="Estoque Crítico — Em Breve" />} />
+              <Route path="/relatorios/vendas" element={<SalesByPeriod />} />
+              <Route path="/relatorios/mais-vendidos" element={<TopSelling />} />
+              <Route path="/relatorios/lucratividade" element={<Profitability />} />
+              <Route path="/relatorios/fluxo-caixa" element={<CashFlow />} />
+              <Route path="/relatorios/estoque-critico" element={<CriticalStock />} />
               {/* Configurações */}
               <Route path="/config/geral" element={<ComingSoon title="Configurações Gerais — Em Breve" />} />
               <Route path="/config/pdv" element={<ComingSoon title="PDV / Integração — Em Breve" />} />
