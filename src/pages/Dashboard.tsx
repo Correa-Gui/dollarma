@@ -8,11 +8,13 @@ import { SalesHeatmap } from "@/components/dashboard/SalesHeatmap";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
 import { useDashboardKpis } from "@/hooks/useDashboardData";
+import { useKpiSparklines } from "@/hooks/useKpiSparklines";
 import { DollarSign, TrendingUp, ShoppingCart, Receipt, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Dashboard = () => {
   const { data: kpis, isLoading } = useDashboardKpis();
+  const { data: sparklines } = useKpiSparklines();
 
   const kpiData = kpis ?? {
     revenueToday: { value: 0, change: 0 },
@@ -32,10 +34,10 @@ const Dashboard = () => {
         <div className="flex items-center justify-center h-32"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard title="Faturamento Hoje" value={kpiData.revenueToday.value} change={kpiData.revenueToday.change} icon={DollarSign} format="currency" index={0} />
-          <KpiCard title="Faturamento do Mês" value={kpiData.revenueMonth.value} change={kpiData.revenueMonth.change} icon={TrendingUp} format="currency" index={1} />
-          <KpiCard title="Vendas Hoje" value={kpiData.salesToday.value} change={kpiData.salesToday.change} icon={ShoppingCart} format="number" index={2} />
-          <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" index={3} />
+          <KpiCard title="Faturamento Hoje" value={kpiData.revenueToday.value} change={kpiData.revenueToday.change} icon={DollarSign} format="currency" index={0} sparkline={sparklines?.revenueToday} />
+          <KpiCard title="Faturamento do Mês" value={kpiData.revenueMonth.value} change={kpiData.revenueMonth.change} icon={TrendingUp} format="currency" index={1} sparkline={sparklines?.revenueMonth} />
+          <KpiCard title="Vendas Hoje" value={kpiData.salesToday.value} change={kpiData.salesToday.change} icon={ShoppingCart} format="number" index={2} sparkline={sparklines?.salesToday} />
+          <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" index={3} sparkline={sparklines?.avgTicket} />
         </div>
       )}
 
