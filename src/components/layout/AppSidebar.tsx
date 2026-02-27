@@ -24,6 +24,7 @@ import {
   Users,
   FileText,
   Store,
+  BookOpen,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,7 @@ const menuItems = [
       { title: "PDV / Integração", url: "/config/pdv", icon: MonitorSmartphone },
       { title: "Usuários", url: "/config/usuarios", icon: Users },
       { title: "Plano de Contas", url: "/config/plano-contas", icon: FileText },
+      { title: "API Docs", url: "/config/api-docs", icon: BookOpen },
     ],
   },
 ];
