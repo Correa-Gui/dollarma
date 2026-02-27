@@ -23,6 +23,8 @@ import CriticalStock from "./pages/reports/CriticalStock";
 import Seasonality from "./pages/reports/Seasonality";
 import CategoryAnalysis from "./pages/reports/CategoryAnalysis";
 import AbcCurve from "./pages/reports/AbcCurve";
+import TicketByPayment from "./pages/reports/TicketByPayment";
+import StockTurnover from "./pages/reports/StockTurnover";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
@@ -68,6 +70,8 @@ const App = () => (
                 <Route path="/relatorios/sazonalidade" element={<Seasonality />} />
                 <Route path="/relatorios/categorias" element={<CategoryAnalysis />} />
                 <Route path="/relatorios/curva-abc" element={<AbcCurve />} />
+                <Route path="/relatorios/ticket-pagamento" element={<TicketByPayment />} />
+                <Route path="/relatorios/giro-estoque" element={<StockTurnover />} />
                 <Route path="/config/geral" element={<GeneralSettings />} />
                 <Route path="/config/pdv" element={<PdvSettings />} />
                 <Route path="/config/usuarios" element={<UsersSettings />} />

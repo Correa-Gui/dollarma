@@ -28,6 +28,8 @@ import {
   CalendarRange,
   PieChart,
   BarChart2,
+  CreditCard,
+  RefreshCw,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -93,6 +95,8 @@ const menuItems = [
       { title: "Sazonalidade", url: "/relatorios/sazonalidade", icon: CalendarRange },
       { title: "Categorias", url: "/relatorios/categorias", icon: PieChart },
       { title: "Curva ABC", url: "/relatorios/curva-abc", icon: BarChart2 },
+      { title: "Ticket × Pagamento", url: "/relatorios/ticket-pagamento", icon: CreditCard },
+      { title: "Giro de Estoque", url: "/relatorios/giro-estoque", icon: RefreshCw },
     ],
   },
   {
