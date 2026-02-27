@@ -323,6 +323,39 @@ export type Database = {
           },
         ]
       }
+      store_settings: {
+        Row: {
+          address: string | null
+          cnpj: string | null
+          created_at: string
+          currency: string
+          id: string
+          store_name: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          store_name?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          cnpj?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          store_name?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           avg_delivery_days: number | null
