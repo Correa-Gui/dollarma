@@ -6,10 +6,19 @@ import { StockEvolutionChart } from "@/components/dashboard/StockEvolutionChart"
 import { SalesByHourChart } from "@/components/dashboard/SalesByHourChart";
 import { CriticalStockPanel } from "@/components/dashboard/CriticalStockPanel";
 import { PdvStatusPanel } from "@/components/dashboard/PdvStatusPanel";
-import { kpiData } from "@/data/mock-data";
-import { DollarSign, TrendingUp, ShoppingCart, Receipt } from "lucide-react";
+import { useDashboardKpis } from "@/hooks/useDashboardData";
+import { DollarSign, TrendingUp, ShoppingCart, Receipt, Loader2 } from "lucide-react";
 
 const Dashboard = () => {
+  const { data: kpis, isLoading } = useDashboardKpis();
+
+  const kpiData = kpis ?? {
+    revenueToday: { value: 0, change: 0 },
+    revenueMonth: { value: 0, change: 0 },
+    salesToday: { value: 0, change: 0 },
+    avgTicket: { value: 0, change: 0 },
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -17,59 +26,32 @@ const Dashboard = () => {
         <p className="text-muted-foreground">Visão geral do seu negócio</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title="Faturamento Hoje"
-          value={kpiData.revenueToday.value}
-          change={kpiData.revenueToday.change}
-          icon={DollarSign}
-          format="currency"
-        />
-        <KpiCard
-          title="Faturamento do Mês"
-          value={kpiData.revenueMonth.value}
-          change={kpiData.revenueMonth.change}
-          icon={TrendingUp}
-          format="currency"
-        />
-        <KpiCard
-          title="Vendas Hoje"
-          value={kpiData.salesToday.value}
-          change={kpiData.salesToday.change}
-          icon={ShoppingCart}
-          format="number"
-        />
-        <KpiCard
-          title="Ticket Médio"
-          value={kpiData.avgTicket.value}
-          change={kpiData.avgTicket.change}
-          icon={Receipt}
-          format="currency"
-        />
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RevenueChart />
+      {isLoading ? (
+        <div className="flex items-center justify-center h-32"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard title="Faturamento Hoje" value={kpiData.revenueToday.value} change={kpiData.revenueToday.change} icon={DollarSign} format="currency" />
+          <KpiCard title="Faturamento do Mês" value={kpiData.revenueMonth.value} change={kpiData.revenueMonth.change} icon={TrendingUp} format="currency" />
+          <KpiCard title="Vendas Hoje" value={kpiData.salesToday.value} change={kpiData.salesToday.change} icon={ShoppingCart} format="number" />
+          <KpiCard title="Ticket Médio" value={kpiData.avgTicket.value} change={kpiData.avgTicket.change} icon={Receipt} format="currency" />
         </div>
+      )}
+
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+        <div className="lg:col-span-2"><RevenueChart /></div>
         <PaymentMethodChart />
       </div>
 
-      {/* Charts Row 2 */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <TopProductsChart />
         <SalesByHourChart />
       </div>
 
-      {/* Charts Row 3 */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <StockEvolutionChart />
         <CriticalStockPanel />
       </div>
 
-      {/* PDV Panel */}
       <PdvStatusPanel />
     </div>
   );
