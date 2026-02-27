@@ -10,6 +10,9 @@ import Products from "./pages/stock/Products";
 import Categories from "./pages/stock/Categories";
 import Suppliers from "./pages/stock/Suppliers";
 import Movements from "./pages/stock/Movements";
+import Inventory from "./pages/stock/Inventory";
+import SalesHistory from "./pages/sales/SalesHistory";
+import Refunds from "./pages/sales/Refunds";
 import ComingSoon from "./pages/ComingSoon";
 import NotFound from "./pages/NotFound";
 
@@ -30,10 +33,10 @@ const App = () => (
               <Route path="/estoque/categorias" element={<Categories />} />
               <Route path="/estoque/fornecedores" element={<Suppliers />} />
               <Route path="/estoque/movimentacoes" element={<Movements />} />
-              <Route path="/estoque/inventario" element={<ComingSoon title="Inventário — Em Breve" />} />
+              <Route path="/estoque/inventario" element={<Inventory />} />
               {/* Vendas */}
-              <Route path="/vendas/historico" element={<ComingSoon title="Histórico de Vendas — Em Breve" />} />
-              <Route path="/vendas/devolucoes" element={<ComingSoon title="Devoluções — Em Breve" />} />
+              <Route path="/vendas/historico" element={<SalesHistory />} />
+              <Route path="/vendas/devolucoes" element={<Refunds />} />
               {/* Relatórios */}
               <Route path="/relatorios/vendas" element={<ComingSoon title="Vendas por Período — Em Breve" />} />
               <Route path="/relatorios/mais-vendidos" element={<ComingSoon title="Mais Vendidos — Em Breve" />} />
