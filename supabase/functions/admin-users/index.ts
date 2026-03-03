@@ -68,6 +68,22 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Check unique display_name
+      if (display_name) {
+        const { data: existing } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("display_name", display_name)
+          .maybeSingle();
+
+        if (existing) {
+          return new Response(
+            JSON.stringify({ error: "Já existe um usuário com este nome" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       // Create user via admin API
       const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -111,6 +127,20 @@ Deno.serve(async (req) => {
 
       // Update display_name in profiles
       if (display_name !== undefined) {
+        // Check unique display_name
+        const { data: existing } = await supabaseAdmin
+          .from("profiles")
+          .select("id, user_id")
+          .eq("display_name", display_name)
+          .maybeSingle();
+
+        if (existing && existing.user_id !== user_id) {
+          return new Response(
+            JSON.stringify({ error: "Já existe um usuário com este nome" }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         await supabaseAdmin
           .from("profiles")
           .update({ display_name })

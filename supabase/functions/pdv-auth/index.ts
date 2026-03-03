@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-pdv-token",
+    "authorization, x-client-info, apikey, content-type, x-pdv-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -55,18 +55,42 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { email, password } = body;
+  const { username, password } = body;
 
-  if (!email || !password) {
+  if (!username || !password) {
     return new Response(
-      JSON.stringify({ error: "email and password are required" }),
+      JSON.stringify({ error: "username and password are required" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  // Authenticate user via Supabase Auth
+  // Look up user by display_name in profiles
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, avatar_url")
+    .eq("display_name", username)
+    .single();
+
+  if (profileErr || !profile) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid credentials" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Get the user's email from auth.users via admin API
+  const { data: authUser, error: authUserErr } = await supabase.auth.admin.getUserById(profile.user_id);
+
+  if (authUserErr || !authUser?.user?.email) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Invalid credentials" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Authenticate with the resolved email + provided password
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
+    email: authUser.user.email,
     password,
   });
 
@@ -86,20 +110,13 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .single();
 
-  // Fetch user profile
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, avatar_url")
-    .eq("user_id", userId)
-    .single();
-
   return new Response(
     JSON.stringify({
       success: true,
       user: {
         id: userId,
         email: authData.user.email,
-        display_name: profile?.display_name ?? null,
+        display_name: profile.display_name ?? null,
         role: roleData?.role ?? "cashier",
       },
       terminal: {
