@@ -299,6 +299,82 @@ const endpoints: EndpointProps[] = [
   ${BASE_URL}/pdv-terminal-status \\
   -H "x-pdv-token: tk_live_abc123def456"`,
   },
+  {
+    method: "POST",
+    path: "/pdv-cash-register?action=open",
+    title: "Abrir Caixa",
+    description: "Abre uma nova sessão de caixa para o terminal. Apenas uma sessão aberta por terminal é permitida.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({ operator_id: "uuid-do-operador", opening_balance: 200 }, null, 2),
+    responses: [
+      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", terminal_id: "uuid-terminal", opened_at: "2026-03-03T08:00:00Z", opening_balance: 200, status: "open" } }, null, 2) },
+      { status: 409, label: "Já aberto", body: JSON.stringify({ error: "Terminal already has an open session", session_id: "uuid-sessao-existente" }, null, 2) },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-cash-register?action=open \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"operator_id":"uuid","opening_balance":200}'`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-cash-register?action=close",
+    title: "Fechar Caixa",
+    description: "Fecha a sessão de caixa. Calcula automaticamente o saldo esperado e a diferença em relação ao saldo informado.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({ session_id: "uuid-sessao", operator_id: "uuid-do-operador", closing_balance: 148, notes: "Faltou R$2" }, null, 2),
+    responses: [
+      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", closing_balance: 148, expected_balance: 150, difference: -2, status: "closed" } }, null, 2) },
+      { status: 404, label: "Sessão não encontrada", body: JSON.stringify({ error: "Open session not found" }, null, 2) },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-cash-register?action=close \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"session_id":"uuid","operator_id":"uuid","closing_balance":148}'`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-cash-register?action=withdrawal",
+    title: "Sangria",
+    description: "Registra uma sangria (retirada de dinheiro) na sessão aberta do terminal.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({ session_id: "uuid-sessao", amount: 50, description: "Sangria para cofre", operator_id: "uuid" }, null, 2),
+    responses: [
+      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, movement: { id: "uuid-mov", type: "withdrawal", amount: 50, description: "Sangria para cofre" } }, null, 2) },
+      { status: 400, label: "Dados inválidos", body: JSON.stringify({ error: "session_id and positive amount are required" }, null, 2) },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-cash-register?action=withdrawal \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"session_id":"uuid","amount":50,"description":"Sangria"}'`,
+  },
+  {
+    method: "GET",
+    path: "/pdv-cash-register?action=status",
+    title: "Status do Caixa",
+    description: "Retorna o status atual do caixa do terminal: se está aberto, saldo corrente, totais de vendas, sangrias e suprimentos.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+    ],
+    responses: [
+      { status: 200, label: "Caixa aberto", body: JSON.stringify({ open: true, session_id: "uuid", current_balance: 150, total_sales: 0, total_withdrawals: 50, total_deposits: 0, movements_count: 1 }, null, 2) },
+      { status: 200, label: "Caixa fechado", body: JSON.stringify({ open: false, terminal_id: "uuid" }, null, 2) },
+    ],
+    curlExample: `curl -X GET \\
+  ${BASE_URL}/pdv-cash-register?action=status \\
+  -H "x-pdv-token: tk_live_abc123def456"`,
+  },
 ];
 
 const ApiDocs = () => (
@@ -330,8 +406,8 @@ const ApiDocs = () => (
 
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Endpoints</h2>
-      {endpoints.map((ep) => (
-        <EndpointCard key={ep.path} {...ep} />
+      {endpoints.map((ep, i) => (
+        <EndpointCard key={`${ep.method}-${ep.path}-${i}`} {...ep} />
       ))}
     </div>
   </div>
