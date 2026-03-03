@@ -2,3 +2,6 @@ project_id = "lyrsqjzsbtxtmyfpjbhv"
 
 [functions.pdv-cash-register]
 verify_jwt = false
+
+[functions.pdv-store-settings]
+verify_jwt = false
