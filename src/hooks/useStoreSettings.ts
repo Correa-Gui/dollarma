@@ -9,6 +9,7 @@ export type StoreSettings = {
   address: string | null;
   timezone: string;
   currency: string;
+  logo_url: string | null;
 };
 
 export function useStoreSettings() {
