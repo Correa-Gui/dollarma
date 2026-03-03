@@ -19,6 +19,7 @@ import SalesByPeriod from "./pages/reports/SalesByPeriod";
 import TopSelling from "./pages/reports/TopSelling";
 import Profitability from "./pages/reports/Profitability";
 import CashFlow from "./pages/reports/CashFlow";
+import CashRegister from "./pages/reports/CashRegister";
 import CriticalStock from "./pages/reports/CriticalStock";
 import Seasonality from "./pages/reports/Seasonality";
 import CategoryAnalysis from "./pages/reports/CategoryAnalysis";
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="/relatorios/curva-abc" element={<AbcCurve />} />
                 <Route path="/relatorios/ticket-pagamento" element={<TicketByPayment />} />
                 <Route path="/relatorios/giro-estoque" element={<StockTurnover />} />
+                <Route path="/relatorios/caixa" element={<CashRegister />} />
                 <Route path="/config/geral" element={<GeneralSettings />} />
                 <Route path="/config/pdv" element={<PdvSettings />} />
                 <Route path="/config/usuarios" element={<UsersSettings />} />

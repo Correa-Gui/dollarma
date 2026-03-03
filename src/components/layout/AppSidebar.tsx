@@ -97,6 +97,7 @@ const menuItems = [
       { title: "Curva ABC", url: "/relatorios/curva-abc", icon: BarChart2 },
       { title: "Ticket × Pagamento", url: "/relatorios/ticket-pagamento", icon: CreditCard },
       { title: "Giro de Estoque", url: "/relatorios/giro-estoque", icon: RefreshCw },
+      { title: "Caixa Diário", url: "/relatorios/caixa", icon: Wallet },
     ],
   },
   {

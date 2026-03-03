@@ -1,1 +1,4 @@
 project_id = "lyrsqjzsbtxtmyfpjbhv"
+
+[functions.pdv-cash-register]
+verify_jwt = false
