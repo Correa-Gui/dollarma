@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
   // Fetch store settings
   const { data: settings, error: settErr } = await supabase
     .from("store_settings")
-    .select("store_name, cnpj, address, timezone, currency")
+    .select("store_name, cnpj, address, timezone, currency, logo_url")
     .limit(1)
     .maybeSingle();
 
@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
         address: null,
         timezone: "America/Sao_Paulo",
         currency: "BRL",
+        logo_url: null,
       },
     }),
     {

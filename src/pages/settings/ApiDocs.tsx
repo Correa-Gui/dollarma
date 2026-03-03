@@ -379,7 +379,7 @@ const endpoints: EndpointProps[] = [
     method: "GET",
     path: "/pdv-store-settings",
     title: "Configurações da Loja",
-    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário e moeda. Útil para exibir dados fiscais em cupons e recibos no PDV.",
+    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário, moeda e logo. Útil para exibir dados fiscais e identidade visual em cupons e recibos no PDV.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
     ],
@@ -395,6 +395,7 @@ const endpoints: EndpointProps[] = [
             address: "Rua Exemplo, 123 - Centro",
             timezone: "America/Sao_Paulo",
             currency: "BRL",
+            logo_url: "https://...storage.../store-assets/logo.png",
           },
         }, null, 2),
       },
