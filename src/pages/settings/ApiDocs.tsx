@@ -375,6 +375,39 @@ const endpoints: EndpointProps[] = [
   ${BASE_URL}/pdv-cash-register?action=status \\
   -H "x-pdv-token: tk_live_abc123def456"`,
   },
+  {
+    method: "GET",
+    path: "/pdv-store-settings",
+    title: "Configurações da Loja",
+    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário e moeda. Útil para exibir dados fiscais em cupons e recibos no PDV.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+    ],
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          terminal: "PDV 01 - Caixa Principal",
+          settings: {
+            store_name: "Minha Loja",
+            cnpj: "12.345.678/0001-99",
+            address: "Rua Exemplo, 123 - Centro",
+            timezone: "America/Sao_Paulo",
+            currency: "BRL",
+          },
+        }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X GET \\
+  ${BASE_URL}/pdv-store-settings \\
+  -H "x-pdv-token: tk_live_abc123def456"`,
+  },
 ];
 
 const ApiDocs = () => (
