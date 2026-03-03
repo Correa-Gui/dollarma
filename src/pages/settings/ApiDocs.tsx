@@ -121,6 +121,57 @@ const EndpointCard = ({ method, path, title, description, headers, requestBody, 
 
 const endpoints: EndpointProps[] = [
   {
+    method: "POST",
+    path: "/pdv-auth",
+    title: "Autenticação do Operador",
+    description: "Autentica um operador (caixa, gerente, admin) no terminal PDV. Requer token de terminal válido. Retorna dados do usuário, role e informações do terminal.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV cadastrado no sistema" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      email: "operador@loja.com",
+      password: "senha123",
+    }, null, 2),
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          success: true,
+          user: {
+            id: "a1b2c3d4-...",
+            email: "operador@loja.com",
+            display_name: "João Silva",
+            role: "cashier",
+          },
+          terminal: {
+            id: "e5f6g7h8-...",
+            name: "PDV 01 - Caixa Principal",
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "email and password are required" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Credenciais inválidas",
+        body: JSON.stringify({ success: false, error: "Invalid credentials" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-auth \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "operador@loja.com",
+    "password": "senha123"
+  }'`,
+  },
+  {
     method: "GET",
     path: "/pdv-catalog",
     title: "Catálogo de Produtos",
