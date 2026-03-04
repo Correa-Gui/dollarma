@@ -1,0 +1,1 @@
+ALTER TABLE public.sales ADD COLUMN session_id uuid REFERENCES public.cash_register_sessions(id) ON DELETE SET NULL;

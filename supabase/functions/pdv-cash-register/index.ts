@@ -10,6 +10,12 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const token = req.headers.get("x-pdv-token");
   if (!token) {
     return new Response(JSON.stringify({ error: "Missing x-pdv-token header" }), {
@@ -35,17 +41,34 @@ Deno.serve(async (req) => {
     });
   }
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action"); // open, close, withdrawal, deposit, status
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { action, amount, operator_id, datetime, notes } = body;
+
+  if (!action || !["open", "close"].includes(action)) {
+    return new Response(
+      JSON.stringify({ error: "action must be 'open' or 'close'" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
 
   try {
     // ========== OPEN ==========
-    if (req.method === "POST" && action === "open") {
-      const body = await req.json();
-      const { operator_id, opening_balance = 0 } = body;
-      if (!operator_id) throw { status: 400, message: "operator_id is required" };
+    if (action === "open") {
+      if (!operator_id) {
+        return new Response(JSON.stringify({ error: "operator_id is required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // Check if there's already an open session
+      // Check if there's already an open session for this terminal
       const { data: existing } = await supabase
         .from("cash_register_sessions")
         .select("id")
@@ -53,25 +76,41 @@ Deno.serve(async (req) => {
         .eq("status", "open")
         .maybeSingle();
 
-      if (existing) throw { status: 409, message: "Terminal already has an open session", session_id: existing.id };
+      if (existing) {
+        return new Response(
+          JSON.stringify({ error: "Terminal already has an open session", session_id: existing.id }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       const { data: session, error } = await supabase
         .from("cash_register_sessions")
-        .insert({ terminal_id: terminal.id, opened_by: operator_id, opening_balance })
-        .select()
+        .insert({
+          terminal_id: terminal.id,
+          opened_by: operator_id,
+          opening_balance: amount ?? 0,
+          opened_at: datetime ?? new Date().toISOString(),
+        })
+        .select("id, terminal_id, opened_at, opening_balance, status")
         .single();
 
-      if (error) throw { status: 500, message: error.message };
-      return json({ success: true, session });
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ success: true, session }), {
+        status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ========== CLOSE ==========
-    if (req.method === "POST" && action === "close") {
-      const body = await req.json();
-      const { session_id, operator_id, closing_balance = 0, notes } = body;
-      if (!session_id || !operator_id) throw { status: 400, message: "session_id and operator_id are required" };
+    if (action === "close") {
+      const { session_id } = body;
+      if (!session_id || !operator_id) {
+        return new Response(JSON.stringify({ error: "session_id and operator_id are required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // Get session and compute expected
+      // Get the open session
       const { data: session, error: sessErr } = await supabase
         .from("cash_register_sessions")
         .select("*")
@@ -80,114 +119,70 @@ Deno.serve(async (req) => {
         .eq("status", "open")
         .single();
 
-      if (sessErr || !session) throw { status: 404, message: "Open session not found" };
+      if (sessErr || !session) {
+        return new Response(JSON.stringify({ error: "Open session not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      // Sum movements
+      // Compute expected balance from sales + movements
+      let expected = Number(session.opening_balance);
+
+      // Sum sales linked to this session
+      const { data: salesData } = await supabase
+        .from("sales")
+        .select("total, payment_method")
+        .eq("session_id", session_id)
+        .eq("status", "completed");
+
+      let totalSales = 0;
+      (salesData || []).forEach((s: any) => {
+        totalSales += Number(s.total);
+        // Only cash sales affect the cash register balance
+        if (["dinheiro", "Dinheiro", "cash"].includes(s.payment_method)) {
+          expected += Number(s.total);
+        }
+      });
+
+      // Sum movements (withdrawals/deposits)
       const { data: movs } = await supabase
         .from("cash_register_movements")
         .select("type, amount")
         .eq("session_id", session_id);
 
-      let expected = Number(session.opening_balance);
       (movs || []).forEach((m: any) => {
         const amt = Number(m.amount);
-        if (m.type === "sale" || m.type === "deposit") expected += amt;
-        else if (m.type === "withdrawal" || m.type === "refund") expected -= amt;
+        if (m.type === "deposit") expected += amt;
+        else if (m.type === "withdrawal") expected -= amt;
       });
 
-      const difference = closing_balance - expected;
+      const closingBalance = amount ?? 0;
+      const difference = +(closingBalance - expected).toFixed(2);
 
       const { data: updated, error: updErr } = await supabase
         .from("cash_register_sessions")
-        .update({ closed_by: operator_id, closed_at: new Date().toISOString(), closing_balance, expected_balance: +expected.toFixed(2), difference: +difference.toFixed(2), status: "closed", notes })
+        .update({
+          closed_by: operator_id,
+          closed_at: datetime ?? new Date().toISOString(),
+          closing_balance: closingBalance,
+          expected_balance: +expected.toFixed(2),
+          difference,
+          status: "closed",
+          notes: notes ?? null,
+        })
         .eq("id", session_id)
         .select()
         .single();
 
-      if (updErr) throw { status: 500, message: updErr.message };
-      return json({ success: true, session: updated });
-    }
+      if (updErr) throw updErr;
 
-    // ========== WITHDRAWAL / DEPOSIT ==========
-    if (req.method === "POST" && (action === "withdrawal" || action === "deposit")) {
-      const body = await req.json();
-      const { session_id, amount, description, operator_id } = body;
-      if (!session_id || !amount || amount <= 0) throw { status: 400, message: "session_id and positive amount are required" };
-
-      // Verify session is open
-      const { data: sess } = await supabase
-        .from("cash_register_sessions")
-        .select("id")
-        .eq("id", session_id)
-        .eq("terminal_id", terminal.id)
-        .eq("status", "open")
-        .single();
-
-      if (!sess) throw { status: 404, message: "Open session not found" };
-
-      const { data: mov, error } = await supabase
-        .from("cash_register_movements")
-        .insert({ session_id, type: action, amount, description: description || (action === "withdrawal" ? "Sangria" : "Suprimento"), created_by: operator_id })
-        .select()
-        .single();
-
-      if (error) throw { status: 500, message: error.message };
-      return json({ success: true, movement: mov });
-    }
-
-    // ========== STATUS (GET) ==========
-    if (req.method === "GET" && action === "status") {
-      const { data: session } = await supabase
-        .from("cash_register_sessions")
-        .select("*")
-        .eq("terminal_id", terminal.id)
-        .eq("status", "open")
-        .maybeSingle();
-
-      if (!session) return json({ open: false, terminal_id: terminal.id });
-
-      const { data: movs } = await supabase
-        .from("cash_register_movements")
-        .select("type, amount")
-        .eq("session_id", session.id);
-
-      let currentBalance = Number(session.opening_balance);
-      let totalSales = 0, totalWithdrawals = 0, totalDeposits = 0;
-      (movs || []).forEach((m: any) => {
-        const amt = Number(m.amount);
-        if (m.type === "sale") { currentBalance += amt; totalSales += amt; }
-        else if (m.type === "deposit") { currentBalance += amt; totalDeposits += amt; }
-        else if (m.type === "withdrawal") { currentBalance -= amt; totalWithdrawals += amt; }
-        else if (m.type === "refund") { currentBalance -= amt; }
-      });
-
-      return json({
-        open: true,
-        session_id: session.id,
-        terminal_id: terminal.id,
-        opened_at: session.opened_at,
-        opening_balance: session.opening_balance,
-        current_balance: +currentBalance.toFixed(2),
-        total_sales: +totalSales.toFixed(2),
-        total_withdrawals: +totalWithdrawals.toFixed(2),
-        total_deposits: +totalDeposits.toFixed(2),
-        movements_count: (movs || []).length,
+      return new Response(JSON.stringify({ success: true, session: updated, total_sales: +totalSales.toFixed(2) }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    return new Response(JSON.stringify({ error: "Invalid action. Use ?action=open|close|withdrawal|deposit|status" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (e: any) {
-    const status = e.status || 500;
-    return new Response(JSON.stringify({ error: e.message, ...(e.session_id ? { session_id: e.session_id } : {}) }), {
-      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-
-function json(data: unknown) {
-  return new Response(JSON.stringify(data), {
-    headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-  });
-}
