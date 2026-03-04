@@ -53,12 +53,16 @@ Deno.serve(async (req) => {
     });
   }
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  let action: string | null = null;
+  let body: any = {};
+
+  if (req.method === "POST" || req.method === "PUT") {
+    body = await req.json();
+    action = body.action || null;
+  }
 
   try {
-    if (action === "create" && req.method === "POST") {
-      const body = await req.json();
+    if (action === "create") {
       const { email, password, display_name, role } = body;
 
       if (!email || !password) {
@@ -114,8 +118,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (action === "update" && req.method === "PUT") {
-      const body = await req.json();
+    if (action === "update") {
       const { user_id, display_name, role } = body;
 
       if (!user_id) {
