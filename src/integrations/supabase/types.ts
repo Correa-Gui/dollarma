@@ -342,6 +342,7 @@ export type Database = {
           origin: string
           payment_method: string
           sale_number: number
+          session_id: string | null
           sold_at: string
           status: string
           terminal_id: string | null
@@ -355,6 +356,7 @@ export type Database = {
           origin?: string
           payment_method?: string
           sale_number?: number
+          session_id?: string | null
           sold_at?: string
           status?: string
           terminal_id?: string | null
@@ -368,12 +370,20 @@ export type Database = {
           origin?: string
           payment_method?: string
           sale_number?: number
+          session_id?: string | null
           sold_at?: string
           status?: string
           terminal_id?: string | null
           total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_register_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_terminal_id_fkey"
             columns: ["terminal_id"]

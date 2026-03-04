@@ -217,12 +217,13 @@ const endpoints: EndpointProps[] = [
     method: "POST",
     path: "/pdv-sales",
     title: "Registrar Venda",
-    description: "Registra uma nova venda no sistema. Automaticamente: cria os itens da venda, debita o estoque de cada produto e gera movimentações de saída.",
+    description: "Registra uma nova venda vinculada a uma sessão de caixa aberta. Automaticamente: cria os itens da venda, debita o estoque de cada produto e gera movimentações de saída.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
     ],
     requestBody: JSON.stringify({
+      session_id: "uuid-da-sessao-aberta",
       payment_method: "pix",
       items: [
         { product_id: "a1b2c3d4-...", quantity: 2 },
@@ -243,17 +244,12 @@ const endpoints: EndpointProps[] = [
       {
         status: 400,
         label: "Dados inválidos",
-        body: JSON.stringify({ error: "payment_method and items[] are required" }, null, 2),
+        body: JSON.stringify({ error: "session_id is required (open cash register session)" }, null, 2),
       },
       {
         status: 401,
         label: "Não autorizado",
         body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
-      },
-      {
-        status: 404,
-        label: "Produto não encontrado",
-        body: JSON.stringify({ error: "Product a1b2c3d4-... not found" }, null, 2),
       },
     ],
     curlExample: `curl -X POST \\
@@ -261,6 +257,7 @@ const endpoints: EndpointProps[] = [
   -H "x-pdv-token: tk_live_abc123def456" \\
   -H "Content-Type: application/json" \\
   -d '{
+    "session_id": "uuid-da-sessao",
     "payment_method": "pix",
     "items": [
       { "product_id": "a1b2c3d4-...", "quantity": 2 }
@@ -268,118 +265,71 @@ const endpoints: EndpointProps[] = [
   }'`,
   },
   {
-    method: "GET",
-    path: "/pdv-terminal-status",
-    title: "Status do Terminal",
-    description: "Retorna o status atual do terminal, incluindo contagem de vendas e faturamento do dia.",
-    headers: [
-      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
-    ],
-    responses: [
-      {
-        status: 200,
-        label: "Sucesso",
-        body: JSON.stringify({
-          terminal_id: "a1b2c3d4-...",
-          name: "PDV 01 - Caixa Principal",
-          status: "online",
-          last_sync: "2026-02-27T14:30:00.000Z",
-          sync_interval_min: 5,
-          sales_today: 23,
-          revenue_today: 1456.80,
-        }, null, 2),
-      },
-      {
-        status: 401,
-        label: "Não autorizado",
-        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
-      },
-    ],
-    curlExample: `curl -X GET \\
-  ${BASE_URL}/pdv-terminal-status \\
-  -H "x-pdv-token: tk_live_abc123def456"`,
-  },
-  {
     method: "POST",
-    path: "/pdv-cash-register?action=open",
+    path: "/pdv-cash-register",
     title: "Abrir Caixa",
-    description: "Abre uma nova sessão de caixa para o terminal. Apenas uma sessão aberta por terminal é permitida.",
+    description: "Abre uma nova sessão de caixa. Envie action='open', operator_id, amount (saldo inicial) e opcionalmente datetime. Apenas uma sessão aberta por terminal.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
     ],
-    requestBody: JSON.stringify({ operator_id: "uuid-do-operador", opening_balance: 200 }, null, 2),
+    requestBody: JSON.stringify({ action: "open", operator_id: "uuid-do-operador", amount: 200, datetime: "2026-03-04T08:00:00Z" }, null, 2),
     responses: [
-      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", terminal_id: "uuid-terminal", opened_at: "2026-03-03T08:00:00Z", opening_balance: 200, status: "open" } }, null, 2) },
+      { status: 201, label: "Criado", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", terminal_id: "uuid-terminal", opened_at: "2026-03-04T08:00:00Z", opening_balance: 200, status: "open" } }, null, 2) },
       { status: 409, label: "Já aberto", body: JSON.stringify({ error: "Terminal already has an open session", session_id: "uuid-sessao-existente" }, null, 2) },
     ],
     curlExample: `curl -X POST \\
-  ${BASE_URL}/pdv-cash-register?action=open \\
+  ${BASE_URL}/pdv-cash-register \\
   -H "x-pdv-token: tk_live_abc123def456" \\
   -H "Content-Type: application/json" \\
-  -d '{"operator_id":"uuid","opening_balance":200}'`,
+  -d '{"action":"open","operator_id":"uuid","amount":200}'`,
   },
   {
     method: "POST",
-    path: "/pdv-cash-register?action=close",
+    path: "/pdv-cash-register",
     title: "Fechar Caixa",
-    description: "Fecha a sessão de caixa. Calcula automaticamente o saldo esperado e a diferença em relação ao saldo informado.",
+    description: "Fecha a sessão de caixa. Envie action='close', session_id, operator_id, amount (saldo final) e opcionalmente datetime e notes. Calcula automaticamente o saldo esperado (baseado em vendas em dinheiro e sangrias) e a diferença.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
     ],
-    requestBody: JSON.stringify({ session_id: "uuid-sessao", operator_id: "uuid-do-operador", closing_balance: 148, notes: "Faltou R$2" }, null, 2),
+    requestBody: JSON.stringify({ action: "close", session_id: "uuid-sessao", operator_id: "uuid-do-operador", amount: 148, notes: "Faltou R$2" }, null, 2),
     responses: [
-      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", closing_balance: 148, expected_balance: 150, difference: -2, status: "closed" } }, null, 2) },
+      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, session: { id: "uuid-sessao", closing_balance: 148, expected_balance: 150, difference: -2, status: "closed" }, total_sales: 500 }, null, 2) },
       { status: 404, label: "Sessão não encontrada", body: JSON.stringify({ error: "Open session not found" }, null, 2) },
     ],
     curlExample: `curl -X POST \\
-  ${BASE_URL}/pdv-cash-register?action=close \\
+  ${BASE_URL}/pdv-cash-register \\
   -H "x-pdv-token: tk_live_abc123def456" \\
   -H "Content-Type: application/json" \\
-  -d '{"session_id":"uuid","operator_id":"uuid","closing_balance":148}'`,
+  -d '{"action":"close","session_id":"uuid","operator_id":"uuid","amount":148}'`,
   },
   {
     method: "POST",
-    path: "/pdv-cash-register?action=withdrawal",
+    path: "/pdv-sangria",
     title: "Sangria",
-    description: "Registra uma sangria (retirada de dinheiro) na sessão aberta do terminal.",
+    description: "Registra uma sangria (retirada de dinheiro) vinculada a uma sessão de caixa aberta. O valor é descontado do saldo esperado no fechamento.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
     ],
     requestBody: JSON.stringify({ session_id: "uuid-sessao", amount: 50, description: "Sangria para cofre", operator_id: "uuid" }, null, 2),
     responses: [
-      { status: 200, label: "Sucesso", body: JSON.stringify({ success: true, movement: { id: "uuid-mov", type: "withdrawal", amount: 50, description: "Sangria para cofre" } }, null, 2) },
+      { status: 201, label: "Criado", body: JSON.stringify({ success: true, movement: { id: "uuid-mov", type: "withdrawal", amount: 50, description: "Sangria para cofre" } }, null, 2) },
       { status: 400, label: "Dados inválidos", body: JSON.stringify({ error: "session_id and positive amount are required" }, null, 2) },
+      { status: 404, label: "Sessão não encontrada", body: JSON.stringify({ error: "Open session not found for this terminal" }, null, 2) },
     ],
     curlExample: `curl -X POST \\
-  ${BASE_URL}/pdv-cash-register?action=withdrawal \\
+  ${BASE_URL}/pdv-sangria \\
   -H "x-pdv-token: tk_live_abc123def456" \\
   -H "Content-Type: application/json" \\
-  -d '{"session_id":"uuid","amount":50,"description":"Sangria"}'`,
-  },
-  {
-    method: "GET",
-    path: "/pdv-cash-register?action=status",
-    title: "Status do Caixa",
-    description: "Retorna o status atual do caixa do terminal: se está aberto, saldo corrente, totais de vendas, sangrias e suprimentos.",
-    headers: [
-      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
-    ],
-    responses: [
-      { status: 200, label: "Caixa aberto", body: JSON.stringify({ open: true, session_id: "uuid", current_balance: 150, total_sales: 0, total_withdrawals: 50, total_deposits: 0, movements_count: 1 }, null, 2) },
-      { status: 200, label: "Caixa fechado", body: JSON.stringify({ open: false, terminal_id: "uuid" }, null, 2) },
-    ],
-    curlExample: `curl -X GET \\
-  ${BASE_URL}/pdv-cash-register?action=status \\
-  -H "x-pdv-token: tk_live_abc123def456"`,
+  -d '{"session_id":"uuid","amount":50,"description":"Sangria para cofre"}'`,
   },
   {
     method: "GET",
     path: "/pdv-store-settings",
     title: "Configurações da Loja",
-    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário, moeda e logo. Útil para exibir dados fiscais e identidade visual em cupons e recibos no PDV.",
+    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário, moeda e logo.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
     ],

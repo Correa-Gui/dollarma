@@ -55,11 +55,18 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { payment_method, items } = body;
+  const { payment_method, items, session_id } = body;
 
   if (!payment_method || !Array.isArray(items) || items.length === 0) {
     return new Response(
-      JSON.stringify({ error: "payment_method and items[] are required" }),
+      JSON.stringify({ error: "payment_method, items[] are required" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (!session_id) {
+    return new Response(
+      JSON.stringify({ error: "session_id is required (open cash register session)" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -118,6 +125,7 @@ Deno.serve(async (req) => {
     .from("sales")
     .insert({
       terminal_id: terminal.id,
+      session_id,
       origin: "pdv",
       payment_method,
       total,
