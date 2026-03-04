@@ -82,19 +82,44 @@ const CashRegister = () => {
     { name: "Fechados", value: kpis.closedCount },
   ].filter((d) => d.value > 0), [kpis]);
 
-  // Movement totals by type for detail dialog (includes sales)
+  // Unified timeline: sales + movements sorted by time
+  const unifiedTimeline = useMemo(() => {
+    const rows: { id: string; type: string; amount: number; payment: string; description: string; time: Date }[] = [];
+
+    sessionSales.forEach((s) => {
+      rows.push({
+        id: s.id,
+        type: "sale",
+        amount: Number(s.total),
+        payment: s.payment_method,
+        description: `Venda #${s.sale_number}`,
+        time: new Date(s.sold_at),
+      });
+    });
+
+    movements.forEach((m) => {
+      rows.push({
+        id: m.id,
+        type: m.type,
+        amount: Number(m.amount),
+        payment: m.type === "withdrawal" ? "Dinheiro" : (m.payment_method ?? "—"),
+        description: m.description ?? "—",
+        time: new Date(m.created_at),
+      });
+    });
+
+    rows.sort((a, b) => a.time.getTime() - b.time.getTime());
+    return rows;
+  }, [movements, sessionSales]);
+
+  // Summary from unified timeline
   const movementSummary = useMemo(() => {
     const map: Record<string, number> = {};
-    movements.forEach((m) => {
-      map[m.type] = (map[m.type] ?? 0) + Number(m.amount);
+    unifiedTimeline.forEach((r) => {
+      map[r.type] = (map[r.type] ?? 0) + r.amount;
     });
-    // Add sales total
-    const salesTotal = sessionSales.filter(s => s.status === "completed").reduce((acc, s) => acc + Number(s.total), 0);
-    if (salesTotal > 0) {
-      map["sale"] = (map["sale"] ?? 0) + salesTotal;
-    }
     return Object.entries(map).map(([type, total]) => ({ type, label: typeLabels[type] ?? type, total }));
-  }, [movements, sessionSales]);
+  }, [unifiedTimeline]);
 
   const exportCSV = () => {
     const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Saldo Final,Diferença,Status\n";
@@ -271,76 +296,37 @@ const CashRegister = () => {
                   ))}
                 </div>
               )}
-              {/* Sales table */}
-              {sessionSales.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Vendas</h4>
-                  <div className="rounded-lg border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>#</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead>Pagamento</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Hora</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sessionSales.map((s) => (
-                          <TableRow key={s.id}>
-                            <TableCell className="font-medium">{s.sale_number}</TableCell>
-                            <TableCell className="text-right font-medium">{fmt(Number(s.total))}</TableCell>
-                            <TableCell className="text-sm">{s.payment_method}</TableCell>
-                            <TableCell>
-                              <Badge variant={s.status === "completed" ? "default" : "secondary"} className="text-xs">
-                                {s.status === "completed" ? "Concluída" : s.status === "cancelled" ? "Cancelada" : s.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">{new Date(s.sold_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-
-              {/* Movements table */}
-              <div>
-                {sessionSales.length > 0 && <h4 className="text-sm font-semibold mb-2">Sangrias / Suprimentos</h4>}
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead>Pagamento</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Hora</TableHead>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="uppercase text-xs">Tipo</TableHead>
+                      <TableHead className="uppercase text-xs text-right">Valor</TableHead>
+                      <TableHead className="uppercase text-xs">Pagamento</TableHead>
+                      <TableHead className="uppercase text-xs">Descrição</TableHead>
+                      <TableHead className="uppercase text-xs">Hora</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unifiedTimeline.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem movimentações</TableCell></TableRow>
+                    ) : unifiedTimeline.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <Badge variant="outline" className={typeColors[r.type] ?? ""}>
+                            {typeLabels[r.type] ?? r.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={`text-right font-medium tabular-nums ${r.type === "withdrawal" ? "text-red-600" : r.type === "sale" ? "text-emerald-600" : ""}`}>
+                          {r.type === "withdrawal" ? "- " : ""}{fmt(r.amount)}
+                        </TableCell>
+                        <TableCell className="text-sm">{r.payment}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate">{r.description}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{r.time.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {movements.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem movimentações</TableCell></TableRow>
-                      ) : movements.map((m) => (
-                        <TableRow key={m.id}>
-                          <TableCell>
-                            <Badge variant="outline" className={typeColors[m.type] ?? ""}>
-                              {typeLabels[m.type] ?? m.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${m.type === "withdrawal" ? "text-red-600" : ""}`}>
-                            {m.type === "withdrawal" ? "- " : ""}{fmt(Math.abs(Number(m.amount)))}
-                          </TableCell>
-                          <TableCell className="text-sm">{m.payment_method ?? "—"}</TableCell>
-                          <TableCell className="text-sm max-w-[200px] truncate">{m.description ?? "—"}</TableCell>
-                          <TableCell className="text-sm">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </>
           )}
