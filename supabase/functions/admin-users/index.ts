@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -11,9 +11,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Require authenticated admin user
   const authHeader = req.headers.get("authorization");
-  if (!authHeader) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Missing authorization" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -25,24 +24,27 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  // Verify caller using getClaims (works with signing-keys)
   const supabaseUser = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { authorization: authHeader } } }
+    { global: { headers: { Authorization: authHeader } } }
   );
 
-  // Verify caller is authenticated
-  const { data: { user: caller }, error: callerErr } = await supabaseUser.auth.getUser();
-  if (callerErr || !caller) {
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claimsData, error: claimsErr } = await supabaseUser.auth.getClaims(token);
+  if (claimsErr || !claimsData?.claims?.sub) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
+  const callerId = claimsData.claims.sub as string;
+
   // Verify caller is admin
   const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
-    _user_id: caller.id,
+    _user_id: callerId,
     _role: "admin",
   });
 
@@ -53,13 +55,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  let action: string | null = null;
   let body: any = {};
-
-  if (req.method === "POST" || req.method === "PUT") {
+  try {
     body = await req.json();
-    action = body.action || null;
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Invalid JSON body" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
+
+  const action = body.action || null;
 
   try {
     if (action === "create") {
@@ -72,7 +78,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check unique display_name
       if (display_name) {
         const { data: existing } = await supabaseAdmin
           .from("profiles")
@@ -88,7 +93,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Create user via admin API
       const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
@@ -103,8 +107,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // The trigger handle_new_user will create profile + default role.
-      // If a specific role was requested (not cashier), update it.
       if (role && role !== "cashier" && newUser.user) {
         await supabaseAdmin
           .from("user_roles")
@@ -128,9 +130,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Update display_name in profiles
       if (display_name !== undefined) {
-        // Check unique display_name
         const { data: existing } = await supabaseAdmin
           .from("profiles")
           .select("id, user_id")
@@ -150,7 +150,6 @@ Deno.serve(async (req) => {
           .eq("user_id", user_id);
       }
 
-      // Update role
       if (role) {
         await supabaseAdmin
           .from("user_roles")
@@ -165,7 +164,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "Invalid action. Use ?action=create or ?action=update" }),
+      JSON.stringify({ error: "Invalid action. Send action: 'create' or 'update' in body" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
