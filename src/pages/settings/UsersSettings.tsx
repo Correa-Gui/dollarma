@@ -82,9 +82,10 @@ const UsersSettings = () => {
     setSaving(true);
 
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await supabase.functions.invoke("admin-users?action=update", {
-      method: "PUT",
+    const res = await supabase.functions.invoke("admin-users", {
+      method: "POST",
       body: {
+        action: "update",
         user_id: editingUser.userId,
         display_name: editName,
         role: newRole,
@@ -122,9 +123,10 @@ const UsersSettings = () => {
     setSaving(true);
 
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await supabase.functions.invoke("admin-users?action=create", {
+    const res = await supabase.functions.invoke("admin-users", {
       method: "POST",
       body: {
+        action: "create",
         email: createEmail,
         password: createPassword,
         display_name: createName || createEmail,
