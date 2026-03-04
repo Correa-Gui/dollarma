@@ -36,3 +36,19 @@ export function useCashRegisterMovements(sessionId?: string) {
     },
   });
 }
+
+export function useCashRegisterSales(sessionId?: string) {
+  return useQuery({
+    queryKey: ["cash_register_sales", sessionId],
+    enabled: !!sessionId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select("id, sale_number, total, payment_method, status, sold_at")
+        .eq("session_id", sessionId!)
+        .order("sold_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+}

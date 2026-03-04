@@ -12,7 +12,7 @@ import {
 import { Download, Loader2, Eye, Wallet, ArrowDownCircle, ArrowUpCircle, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useTerminals } from "@/hooks/useTerminals";
-import { useCashRegisterSessions, useCashRegisterMovements } from "@/hooks/useCashRegister";
+import { useCashRegisterSessions, useCashRegisterMovements, useCashRegisterSales } from "@/hooks/useCashRegister";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -41,6 +41,7 @@ const CashRegister = () => {
     dateTo
   );
   const { data: movements = [], isLoading: loadingMovements } = useCashRegisterMovements(selectedSession ?? undefined);
+  const { data: sessionSales = [], isLoading: loadingSales } = useCashRegisterSales(selectedSession ?? undefined);
 
   const terminalMap = useMemo(() => Object.fromEntries(terminals.map((t) => [t.id, t.name])), [terminals]);
 
@@ -81,14 +82,19 @@ const CashRegister = () => {
     { name: "Fechados", value: kpis.closedCount },
   ].filter((d) => d.value > 0), [kpis]);
 
-  // Movement totals by type for detail dialog
+  // Movement totals by type for detail dialog (includes sales)
   const movementSummary = useMemo(() => {
     const map: Record<string, number> = {};
     movements.forEach((m) => {
       map[m.type] = (map[m.type] ?? 0) + Number(m.amount);
     });
+    // Add sales total
+    const salesTotal = sessionSales.filter(s => s.status === "completed").reduce((acc, s) => acc + Number(s.total), 0);
+    if (salesTotal > 0) {
+      map["sale"] = (map["sale"] ?? 0) + salesTotal;
+    }
     return Object.entries(map).map(([type, total]) => ({ type, label: typeLabels[type] ?? type, total }));
-  }, [movements]);
+  }, [movements, sessionSales]);
 
   const exportCSV = () => {
     const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Saldo Final,Diferença,Status\n";
@@ -251,7 +257,7 @@ const CashRegister = () => {
           <DialogHeader>
             <DialogTitle>Movimentações da Sessão</DialogTitle>
           </DialogHeader>
-          {loadingMovements ? (
+          {(loadingMovements || loadingSales) ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
             <>
@@ -265,37 +271,76 @@ const CashRegister = () => {
                   ))}
                 </div>
               )}
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Pagamento</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Hora</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {movements.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem movimentações</TableCell></TableRow>
-                    ) : movements.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell>
-                          <Badge variant="outline" className={typeColors[m.type] ?? ""}>
-                            {typeLabels[m.type] ?? m.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${m.type === "withdrawal" ? "text-red-600" : ""}`}>
-                          {m.type === "withdrawal" ? "- " : ""}{fmt(Math.abs(Number(m.amount)))}
-                        </TableCell>
-                        <TableCell className="text-sm">{m.payment_method ?? "—"}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{m.description ?? "—"}</TableCell>
-                        <TableCell className="text-sm">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+              {/* Sales table */}
+              {sessionSales.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Vendas</h4>
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead>Pagamento</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Hora</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sessionSales.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">{s.sale_number}</TableCell>
+                            <TableCell className="text-right font-medium">{fmt(Number(s.total))}</TableCell>
+                            <TableCell className="text-sm">{s.payment_method}</TableCell>
+                            <TableCell>
+                              <Badge variant={s.status === "completed" ? "default" : "secondary"} className="text-xs">
+                                {s.status === "completed" ? "Concluída" : s.status === "cancelled" ? "Cancelada" : s.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{new Date(s.sold_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Movements table */}
+              <div>
+                {sessionSales.length > 0 && <h4 className="text-sm font-semibold mb-2">Sangrias / Suprimentos</h4>}
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead>Pagamento</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Hora</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {movements.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem movimentações</TableCell></TableRow>
+                      ) : movements.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell>
+                            <Badge variant="outline" className={typeColors[m.type] ?? ""}>
+                              {typeLabels[m.type] ?? m.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-right font-medium ${m.type === "withdrawal" ? "text-red-600" : ""}`}>
+                            {m.type === "withdrawal" ? "- " : ""}{fmt(Math.abs(Number(m.amount)))}
+                          </TableCell>
+                          <TableCell className="text-sm">{m.payment_method ?? "—"}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">{m.description ?? "—"}</TableCell>
+                          <TableCell className="text-sm">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </>
           )}
