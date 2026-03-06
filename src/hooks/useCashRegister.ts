@@ -1,13 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface CashSession {
+  id: string;
+  terminal_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  opening_balance: number;
+  closing_balance: number | null;
+  expected_balance: number | null;
+  difference: number | null;
+  status: string;
+  opened_by: string;
+  closed_by: string | null;
+  notes: string | null;
+  created_at: string;
+  sales: { id: string; sale_number: number; total: number; payment_method: string; status: string; sold_at: string }[];
+  cash_register_movements: { id: string; type: string; amount: number; payment_method: string | null; description: string | null; created_at: string }[];
+}
+
 export function useCashRegisterSessions(terminalId?: string, dateFrom?: string, dateTo?: string) {
   return useQuery({
     queryKey: ["cash_register_sessions", terminalId, dateFrom, dateTo],
     queryFn: async () => {
       let q = supabase
         .from("cash_register_sessions")
-        .select("*")
+        .select("*, sales(id, sale_number, total, payment_method, status, sold_at), cash_register_movements(id, type, amount, payment_method, description, created_at)")
         .order("opened_at", { ascending: false });
 
       if (terminalId) q = q.eq("terminal_id", terminalId);
@@ -16,39 +34,7 @@ export function useCashRegisterSessions(terminalId?: string, dateFrom?: string, 
 
       const { data, error } = await q;
       if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCashRegisterMovements(sessionId?: string) {
-  return useQuery({
-    queryKey: ["cash_register_movements", sessionId],
-    enabled: !!sessionId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cash_register_movements")
-        .select("*")
-        .eq("session_id", sessionId!)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCashRegisterSales(sessionId?: string) {
-  return useQuery({
-    queryKey: ["cash_register_sales", sessionId],
-    enabled: !!sessionId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sales")
-        .select("id, sale_number, total, payment_method, status, sold_at")
-        .eq("session_id", sessionId!)
-        .order("sold_at", { ascending: true });
-      if (error) throw error;
-      return data;
+      return data as unknown as CashSession[];
     },
   });
 }
