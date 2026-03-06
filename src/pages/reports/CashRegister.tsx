@@ -9,10 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell,
 } from "recharts";
-import { Download, Loader2, Eye, Wallet, ArrowDownCircle, ArrowUpCircle, DollarSign } from "lucide-react";
+import { Download, Loader2, Eye, Wallet, ArrowDownCircle, ArrowUpCircle, DollarSign, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useTerminals } from "@/hooks/useTerminals";
-import { useCashRegisterSessions, useCashRegisterMovements, useCashRegisterSales } from "@/hooks/useCashRegister";
+import { useCashRegisterSessions, type CashSession } from "@/hooks/useCashRegister";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -27,12 +27,47 @@ const typeColors: Record<string, string> = {
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 
+function getSessionSalesTotal(session: CashSession) {
+  return (session.sales ?? [])
+    .filter((s) => s.status === "completed")
+    .reduce((sum, s) => sum + Number(s.total), 0);
+}
+
+function buildTimeline(session: CashSession) {
+  const rows: { id: string; type: string; amount: number; payment: string; description: string; time: Date }[] = [];
+
+  (session.sales ?? []).forEach((s) => {
+    rows.push({
+      id: s.id,
+      type: "sale",
+      amount: Number(s.total),
+      payment: s.payment_method,
+      description: `Venda #${s.sale_number}`,
+      time: new Date(s.sold_at),
+    });
+  });
+
+  (session.cash_register_movements ?? []).forEach((m) => {
+    rows.push({
+      id: m.id,
+      type: m.type,
+      amount: Number(m.amount),
+      payment: m.type === "withdrawal" ? "Dinheiro" : (m.payment_method ?? "—"),
+      description: m.description ?? "—",
+      time: new Date(m.created_at),
+    });
+  });
+
+  rows.sort((a, b) => a.time.getTime() - b.time.getTime());
+  return rows;
+}
+
 const CashRegister = () => {
   const today = new Date().toISOString().slice(0, 10);
   const [terminalId, setTerminalId] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const { data: terminals = [], isLoading: loadingTerminals } = useTerminals();
   const { data: sessions = [], isLoading: loadingSessions } = useCashRegisterSessions(
@@ -40,38 +75,36 @@ const CashRegister = () => {
     dateFrom,
     dateTo
   );
-  const { data: movements = [], isLoading: loadingMovements } = useCashRegisterMovements(selectedSession ?? undefined);
-  const { data: sessionSales = [], isLoading: loadingSales } = useCashRegisterSales(selectedSession ?? undefined);
 
   const terminalMap = useMemo(() => Object.fromEntries(terminals.map((t) => [t.id, t.name])), [terminals]);
 
+  const selectedSession = useMemo(() => sessions.find((s) => s.id === selectedSessionId), [sessions, selectedSessionId]);
+
   // KPIs
   const kpis = useMemo(() => {
-    const totalSales = sessions.reduce((s, ses) => {
-      return s; // we'll compute from movements per session if available, fallback to closing - opening
-    }, 0);
-
-    let openCount = 0, closedCount = 0, totalOpening = 0, totalClosing = 0, totalDiff = 0;
+    let openCount = 0, closedCount = 0, totalOpening = 0, totalClosing = 0, totalDiff = 0, totalSales = 0;
     sessions.forEach((s) => {
       if (s.status === "open") openCount++;
       else closedCount++;
       totalOpening += Number(s.opening_balance ?? 0);
       totalClosing += Number(s.closing_balance ?? 0);
       totalDiff += Number(s.difference ?? 0);
+      totalSales += getSessionSalesTotal(s);
     });
 
-    return { openCount, closedCount, totalOpening, totalClosing, totalDiff, total: sessions.length };
+    return { openCount, closedCount, totalOpening, totalClosing, totalDiff, totalSales, total: sessions.length };
   }, [sessions]);
 
   // Chart: sessions per terminal
   const chartData = useMemo(() => {
-    const map: Record<string, { terminal: string; sessions: number; opening: number; closing: number }> = {};
+    const map: Record<string, { terminal: string; sessions: number; opening: number; closing: number; vendas: number }> = {};
     sessions.forEach((s) => {
       const name = terminalMap[s.terminal_id] ?? "Desconhecido";
-      if (!map[s.terminal_id]) map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, closing: 0 };
+      if (!map[s.terminal_id]) map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, closing: 0, vendas: 0 };
       map[s.terminal_id].sessions++;
       map[s.terminal_id].opening += Number(s.opening_balance ?? 0);
       map[s.terminal_id].closing += Number(s.closing_balance ?? 0);
+      map[s.terminal_id].vendas += getSessionSalesTotal(s);
     });
     return Object.values(map);
   }, [sessions, terminalMap]);
@@ -82,49 +115,21 @@ const CashRegister = () => {
     { name: "Fechados", value: kpis.closedCount },
   ].filter((d) => d.value > 0), [kpis]);
 
-  // Unified timeline: sales + movements sorted by time
-  const unifiedTimeline = useMemo(() => {
-    const rows: { id: string; type: string; amount: number; payment: string; description: string; time: Date }[] = [];
+  // Timeline for selected session
+  const timeline = useMemo(() => selectedSession ? buildTimeline(selectedSession) : [], [selectedSession]);
 
-    sessionSales.forEach((s) => {
-      rows.push({
-        id: s.id,
-        type: "sale",
-        amount: Number(s.total),
-        payment: s.payment_method,
-        description: `Venda #${s.sale_number}`,
-        time: new Date(s.sold_at),
-      });
-    });
-
-    movements.forEach((m) => {
-      rows.push({
-        id: m.id,
-        type: m.type,
-        amount: Number(m.amount),
-        payment: m.type === "withdrawal" ? "Dinheiro" : (m.payment_method ?? "—"),
-        description: m.description ?? "—",
-        time: new Date(m.created_at),
-      });
-    });
-
-    rows.sort((a, b) => a.time.getTime() - b.time.getTime());
-    return rows;
-  }, [movements, sessionSales]);
-
-  // Summary from unified timeline
-  const movementSummary = useMemo(() => {
+  const timelineSummary = useMemo(() => {
     const map: Record<string, number> = {};
-    unifiedTimeline.forEach((r) => {
+    timeline.forEach((r) => {
       map[r.type] = (map[r.type] ?? 0) + r.amount;
     });
     return Object.entries(map).map(([type, total]) => ({ type, label: typeLabels[type] ?? type, total }));
-  }, [unifiedTimeline]);
+  }, [timeline]);
 
   const exportCSV = () => {
-    const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Saldo Final,Diferença,Status\n";
+    const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Total Vendas,Saldo Final,Diferença,Status\n";
     const rows = sessions.map((s) =>
-      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`
+      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${getSessionSalesTotal(s)},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "caixa-diario.csv"; a.click();
@@ -162,7 +167,7 @@ const CashRegister = () => {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10"><Wallet className="h-5 w-5 text-primary" /></div>
@@ -173,6 +178,12 @@ const CashRegister = () => {
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-500/10"><ArrowUpCircle className="h-5 w-5 text-emerald-600" /></div>
             <div><p className="text-xs text-muted-foreground">Total Abertura</p><p className="text-xl font-bold">{fmt(kpis.totalOpening)}</p></div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/10"><ShoppingCart className="h-5 w-5 text-emerald-600" /></div>
+            <div><p className="text-xs text-muted-foreground">Total Vendas</p><p className="text-xl font-bold text-emerald-600">{fmt(kpis.totalSales)}</p></div>
           </CardContent>
         </Card>
         <Card>
@@ -206,6 +217,7 @@ const CashRegister = () => {
                     <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
                     <Legend />
                     <Bar dataKey="opening" fill="hsl(var(--chart-1))" name="Abertura" />
+                    <Bar dataKey="vendas" fill="hsl(var(--chart-3))" name="Vendas" />
                     <Bar dataKey="closing" fill="hsl(var(--chart-2))" name="Fechamento" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -241,6 +253,8 @@ const CashRegister = () => {
               <TableHead>Abertura</TableHead>
               <TableHead>Fechamento</TableHead>
               <TableHead className="text-right">Saldo Inicial</TableHead>
+              <TableHead className="text-right">Vendas</TableHead>
+              <TableHead className="text-right">Sangrias</TableHead>
               <TableHead className="text-right">Saldo Final</TableHead>
               <TableHead className="text-right">Diferença</TableHead>
               <TableHead>Status</TableHead>
@@ -249,49 +263,56 @@ const CashRegister = () => {
           </TableHeader>
           <TableBody>
             {sessions.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
-            ) : sessions.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell className="font-medium">{terminalMap[s.terminal_id] ?? "—"}</TableCell>
-                <TableCell>{fmtDate(s.opened_at)}</TableCell>
-                <TableCell>{s.closed_at ? fmtDate(s.closed_at) : "—"}</TableCell>
-                <TableCell className="text-right">{fmt(Number(s.opening_balance))}</TableCell>
-                <TableCell className="text-right">{s.closing_balance != null ? fmt(Number(s.closing_balance)) : "—"}</TableCell>
-                <TableCell className={`text-right font-medium ${Number(s.difference ?? 0) < 0 ? "text-red-600" : ""}`}>
-                  {s.difference != null ? fmt(Number(s.difference)) : "—"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={s.status === "open" ? "default" : "secondary"} className="text-xs">
-                    {s.status === "open" ? "Aberto" : "Fechado"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedSession(s.id)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
+            ) : sessions.map((s) => {
+              const salesTotal = getSessionSalesTotal(s);
+              const withdrawalsTotal = (s.cash_register_movements ?? [])
+                .filter((m) => m.type === "withdrawal")
+                .reduce((sum, m) => sum + Number(m.amount), 0);
+
+              return (
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">{terminalMap[s.terminal_id] ?? "—"}</TableCell>
+                  <TableCell>{fmtDate(s.opened_at)}</TableCell>
+                  <TableCell>{s.closed_at ? fmtDate(s.closed_at) : "—"}</TableCell>
+                  <TableCell className="text-right">{fmt(Number(s.opening_balance))}</TableCell>
+                  <TableCell className="text-right text-emerald-600 font-medium">{fmt(salesTotal)}</TableCell>
+                  <TableCell className="text-right text-red-600 font-medium">{withdrawalsTotal > 0 ? `- ${fmt(withdrawalsTotal)}` : fmt(0)}</TableCell>
+                  <TableCell className="text-right">{s.closing_balance != null ? fmt(Number(s.closing_balance)) : "—"}</TableCell>
+                  <TableCell className={`text-right font-medium ${Number(s.difference ?? 0) < 0 ? "text-red-600" : ""}`}>
+                    {s.difference != null ? fmt(Number(s.difference)) : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={s.status === "open" ? "default" : "secondary"} className="text-xs">
+                      {s.status === "open" ? "Aberto" : "Fechado"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedSessionId(s.id)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
 
       {/* Detail Dialog */}
-      <Dialog open={!!selectedSession} onOpenChange={(o) => !o && setSelectedSession(null)}>
+      <Dialog open={!!selectedSessionId} onOpenChange={(o) => !o && setSelectedSessionId(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Movimentações da Sessão</DialogTitle>
           </DialogHeader>
-          {(loadingMovements || loadingSales) ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : (
+          {selectedSession && (
             <>
-              {movementSummary.length > 0 && (
+              {timelineSummary.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                  {movementSummary.map((m) => (
+                  {timelineSummary.map((m) => (
                     <div key={m.type} className="rounded-lg border p-3">
                       <p className="text-xs text-muted-foreground">{m.label}</p>
-                      <p className="text-lg font-bold">{fmt(m.total)}</p>
+                      <p className={`text-lg font-bold ${m.type === "sale" ? "text-emerald-600" : m.type === "withdrawal" ? "text-red-600" : ""}`}>{fmt(m.total)}</p>
                     </div>
                   ))}
                 </div>
@@ -308,9 +329,9 @@ const CashRegister = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unifiedTimeline.length === 0 ? (
+                    {timeline.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem movimentações</TableCell></TableRow>
-                    ) : unifiedTimeline.map((r) => (
+                    ) : timeline.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell>
                           <Badge variant="outline" className={typeColors[r.type] ?? ""}>
