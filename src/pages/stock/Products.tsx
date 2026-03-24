@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { BrowserMultiFormatReader, NotFoundException } from "@zxing/browser";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -51,8 +52,7 @@ const Products = () => {
   const [scannerOpen, setScannerOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number>(0);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
 
   // Gera o próximo SKU incremental com base nos SKUs numéricos existentes
   const generateSku = () => {
@@ -63,74 +63,41 @@ const Products = () => {
     return String(max + 1).padStart(6, "0");
   };
 
-  const stopScanner = () => {
-    cancelAnimationFrame(animFrameRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+  const stopScanner = useCallback(() => {
+    if (readerRef.current) {
+      BrowserMultiFormatReader.releaseAllStreams();
+      readerRef.current = null;
     }
     setScannerOpen(false);
-  };
+  }, []);
 
   useEffect(() => {
-    if (!scannerOpen) return;
-    let active = true;
+    if (!scannerOpen || !videoRef.current) return;
 
-    const run = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-        if (!videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+    const reader = new BrowserMultiFormatReader();
+    readerRef.current = reader;
 
-        if (!("BarcodeDetector" in window)) {
-          toast.error("Escaneamento não suportado neste navegador. Use Chrome ou Edge.");
+    reader.decodeFromConstraints(
+      { video: { facingMode: "environment" } },
+      videoRef.current,
+      (result, error) => {
+        if (result) {
+          setEditing((prev) => ({ ...prev, barcode: result.getText() }));
           stopScanner();
-          return;
+        } else if (error && !(error instanceof NotFoundException)) {
+          // NotFoundException é esperado entre frames sem código visível, ignorar
         }
-
-        const detector = new (window as any).BarcodeDetector({
-          formats: ["ean_13", "ean_8", "code_128", "code_39", "qr_code", "upc_a", "upc_e"],
-        });
-
-        const detect = async () => {
-          if (!active || !videoRef.current || videoRef.current.readyState < 2) {
-            animFrameRef.current = requestAnimationFrame(detect);
-            return;
-          }
-          try {
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              setEditing((prev) => ({ ...prev, barcode: barcodes[0].rawValue }));
-              stopScanner();
-              return;
-            }
-          } catch {}
-          animFrameRef.current = requestAnimationFrame(detect);
-        };
-
-        animFrameRef.current = requestAnimationFrame(detect);
-      } catch {
-        toast.error("Não foi possível acessar a câmera.");
-        stopScanner();
       }
-    };
-
-    run();
+    ).catch(() => {
+      toast.error("Não foi possível acessar a câmera.");
+      stopScanner();
+    });
 
     return () => {
-      active = false;
-      cancelAnimationFrame(animFrameRef.current);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
+      BrowserMultiFormatReader.releaseAllStreams();
+      readerRef.current = null;
     };
-  }, [scannerOpen]);
+  }, [scannerOpen, stopScanner]);
 
   const filtered = products.filter((p) => {
     const matchSearch =
