@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -15,18 +15,22 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
-import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X } from "lucide-react";
+import type { TablesInsert } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 type ProductForm = {
-  name: string; sku: string; barcode: string; cost_price: number; sale_price: number;
+  name: string; sku: string; barcode: string;
+  cost_price: string; sale_price: string;
   stock_quantity: number; min_stock: number; unit: string; is_active: boolean;
   category_id: string | null; supplier_id: string | null;
 };
 
+const toInput = (n: number) => (n === 0 ? "" : String(n).replace(".", ","));
+const fromInput = (s: string) => parseFloat(s.replace(",", ".")) || 0;
+
 const emptyForm: ProductForm = {
-  name: "", sku: "", barcode: "", cost_price: 0, sale_price: 0,
+  name: "", sku: "", barcode: "", cost_price: "", sale_price: "",
   stock_quantity: 0, min_stock: 0, unit: "un", is_active: true,
   category_id: null, supplier_id: null,
 };
@@ -44,6 +48,89 @@ const Products = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number>(0);
+
+  // Gera o próximo SKU incremental com base nos SKUs numéricos existentes
+  const generateSku = () => {
+    const nums = products
+      .map((p) => parseInt(p.sku.replace(/\D/g, ""), 10))
+      .filter((n) => !isNaN(n) && n > 0);
+    const max = nums.length > 0 ? Math.max(...nums) : 0;
+    return String(max + 1).padStart(6, "0");
+  };
+
+  const stopScanner = () => {
+    cancelAnimationFrame(animFrameRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setScannerOpen(false);
+  };
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+    let active = true;
+
+    const run = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+
+        if (!("BarcodeDetector" in window)) {
+          toast.error("Escaneamento não suportado neste navegador. Use Chrome ou Edge.");
+          stopScanner();
+          return;
+        }
+
+        const detector = new (window as any).BarcodeDetector({
+          formats: ["ean_13", "ean_8", "code_128", "code_39", "qr_code", "upc_a", "upc_e"],
+        });
+
+        const detect = async () => {
+          if (!active || !videoRef.current || videoRef.current.readyState < 2) {
+            animFrameRef.current = requestAnimationFrame(detect);
+            return;
+          }
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              setEditing((prev) => ({ ...prev, barcode: barcodes[0].rawValue }));
+              stopScanner();
+              return;
+            }
+          } catch {}
+          animFrameRef.current = requestAnimationFrame(detect);
+        };
+
+        animFrameRef.current = requestAnimationFrame(detect);
+      } catch {
+        toast.error("Não foi possível acessar a câmera.");
+        stopScanner();
+      }
+    };
+
+    run();
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(animFrameRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [scannerOpen]);
 
   const filtered = products.filter((p) => {
     const matchSearch =
@@ -55,35 +142,40 @@ const Products = () => {
   });
 
   const openNew = () => {
-    setEditing({ ...emptyForm });
+    setEditing({ ...emptyForm, sku: generateSku() });
     setEditingId(null);
     setDialogOpen(true);
   };
 
   const openEdit = (p: Product) => {
     setEditing({
-      name: p.name, sku: p.sku, barcode: p.barcode ?? "", cost_price: Number(p.cost_price),
-      sale_price: Number(p.sale_price), stock_quantity: p.stock_quantity, min_stock: p.min_stock,
-      unit: p.unit, is_active: p.is_active, category_id: p.category_id, supplier_id: p.supplier_id,
+      name: p.name, sku: p.sku, barcode: p.barcode ?? "",
+      cost_price: toInput(Number(p.cost_price)),
+      sale_price: toInput(Number(p.sale_price)),
+      stock_quantity: p.stock_quantity, min_stock: p.min_stock,
+      unit: p.unit, is_active: p.is_active,
+      category_id: p.category_id, supplier_id: p.supplier_id,
     });
     setEditingId(p.id);
     setDialogOpen(true);
   };
 
   const save = async () => {
-    if (!editing.name || !editing.sku) return;
+    if (!editing.name) return;
+    const salePrice = fromInput(editing.sale_price);
+    const costPrice = fromInput(editing.cost_price) || salePrice; // padrão: igual ao preço de venda
+    const payload = { ...editing, cost_price: costPrice, sale_price: salePrice };
     if (editingId) {
-      await updateProduct.mutateAsync({ id: editingId, ...editing });
+      await updateProduct.mutateAsync({ id: editingId, ...payload });
     } else {
-      await createProduct.mutateAsync(editing as TablesInsert<"products">);
+      await createProduct.mutateAsync(payload as TablesInsert<"products">);
     }
     setDialogOpen(false);
   };
 
-  const margin =
-    editing.cost_price > 0
-      ? (((editing.sale_price - editing.cost_price) / editing.cost_price) * 100).toFixed(1)
-      : "0.0";
+  const saleNum = fromInput(editing.sale_price);
+  const costNum = fromInput(editing.cost_price) || saleNum;
+  const margin = costNum > 0 ? (((saleNum - costNum) / costNum) * 100).toFixed(1) : "0.0";
 
   if (isLoading) {
     return (
@@ -165,16 +257,54 @@ const Products = () => {
         </Table>
       </div>
 
+      {/* Scanner de câmera */}
+      {scannerOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center gap-4">
+          <p className="text-white text-sm font-medium">Aponte a câmera para o código de barras</p>
+          <div className="relative w-full max-w-sm">
+            <video ref={videoRef} className="w-full rounded-lg" muted playsInline />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-primary w-4/5 h-20 rounded-md" />
+            </div>
+          </div>
+          <Button variant="outline" onClick={stopScanner}>
+            <X className="h-4 w-4 mr-1" /> Cancelar
+          </Button>
+        </div>
+      )}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? "Editar Produto" : "Novo Produto"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Nome *</Label><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
-              <div className="space-y-2"><Label>SKU *</Label><Input value={editing.sku} onChange={(e) => setEditing({ ...editing, sku: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>SKU</Label>
+                <Input value={editing.sku} readOnly className="bg-muted font-mono text-sm cursor-default" tabIndex={-1} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Código de Barras</Label><Input value={editing.barcode} onChange={(e) => setEditing({ ...editing, barcode: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>Código de Barras</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={editing.barcode}
+                    onChange={(e) => setEditing({ ...editing, barcode: e.target.value })}
+                    placeholder="Digite ou escaneie"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setScannerOpen(true)}
+                    title="Escanear pela câmera"
+                  >
+                    <ScanLine className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Unidade</Label>
                 <Select value={editing.unit} onValueChange={(v) => setEditing({ ...editing, unit: v })}>
@@ -211,8 +341,24 @@ const Products = () => {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2"><Label>Preço de Custo</Label><Input type="number" step="0.01" value={editing.cost_price} onChange={(e) => setEditing({ ...editing, cost_price: +e.target.value })} /></div>
-              <div className="space-y-2"><Label>Preço de Venda</Label><Input type="number" step="0.01" value={editing.sale_price} onChange={(e) => setEditing({ ...editing, sale_price: +e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>Preço de Custo</Label>
+                <Input
+                  placeholder="0,00 (padrão: venda)"
+                  value={editing.cost_price}
+                  onChange={(e) => setEditing({ ...editing, cost_price: e.target.value })}
+                  inputMode="decimal"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Preço de Venda *</Label>
+                <Input
+                  placeholder="0,00"
+                  value={editing.sale_price}
+                  onChange={(e) => setEditing({ ...editing, sale_price: e.target.value })}
+                  inputMode="decimal"
+                />
+              </div>
               <div className="space-y-2"><Label>Margem (%)</Label><Input disabled value={`${margin}%`} className="bg-muted" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
