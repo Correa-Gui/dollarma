@@ -139,6 +139,8 @@ const Products = () => {
       await createProduct.mutateAsync(payload as TablesInsert<"products">);
     }
     setDialogOpen(false);
+    setEditing(emptyForm);
+    setEditingId(null);
   };
 
   const saleNum = fromInput(editing.sale_price);
@@ -241,7 +243,7 @@ const Products = () => {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditing(emptyForm); setEditingId(null); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? "Editar Produto" : "Novo Produto"}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
