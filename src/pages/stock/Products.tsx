@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { NotFoundException } from "@zxing/library";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
-import { useCategories } from "@/hooks/useCategories";
-import { useSuppliers } from "@/hooks/useSuppliers";
+import { useCategories, useCreateCategory } from "@/hooks/useCategories";
+import { useSuppliers, useCreateSupplier } from "@/hooks/useSuppliers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -44,6 +44,8 @@ const Products = () => {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
+  const createCategory = useCreateCategory();
+  const createSupplier = useCreateSupplier();
 
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -52,10 +54,13 @@ const Products = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
 
+  // Quick-create de categoria/fornecedor
+  const [quickCreate, setQuickCreate] = useState<"category" | "supplier" | null>(null);
+  const [quickName, setQuickName] = useState("");
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
 
-  // Gera o próximo SKU incremental com base nos SKUs numéricos existentes
   const generateSku = () => {
     const nums = products
       .map((p) => parseInt(p.sku.replace(/\D/g, ""), 10))
@@ -131,7 +136,7 @@ const Products = () => {
   const save = async () => {
     if (!editing.name) return;
     const salePrice = fromInput(editing.sale_price);
-    const costPrice = fromInput(editing.cost_price) || salePrice; // padrão: igual ao preço de venda
+    const costPrice = fromInput(editing.cost_price) || salePrice;
     const payload = { ...editing, cost_price: costPrice, sale_price: salePrice };
     if (editingId) {
       await updateProduct.mutateAsync({ id: editingId, ...payload });
@@ -141,6 +146,19 @@ const Products = () => {
     setDialogOpen(false);
     setEditing(emptyForm);
     setEditingId(null);
+  };
+
+  const saveQuickCreate = async () => {
+    if (!quickName.trim()) return;
+    if (quickCreate === "category") {
+      const created = await createCategory.mutateAsync({ name: quickName.trim() });
+      setEditing((prev) => ({ ...prev, category_id: created.id }));
+    } else if (quickCreate === "supplier") {
+      const created = await createSupplier.mutateAsync({ name: quickName.trim() });
+      setEditing((prev) => ({ ...prev, supplier_id: created.id }));
+    }
+    setQuickCreate(null);
+    setQuickName("");
   };
 
   const saleNum = fromInput(editing.sale_price);
@@ -243,6 +261,7 @@ const Products = () => {
         </div>
       )}
 
+      {/* Dialog principal de produto */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditing(emptyForm); setEditingId(null); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingId ? "Editar Produto" : "Novo Produto"}</DialogTitle></DialogHeader>
@@ -264,13 +283,7 @@ const Products = () => {
                     placeholder="Digite ou escaneie"
                     className="flex-1"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setScannerOpen(true)}
-                    title="Escanear pela câmera"
-                  >
+                  <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="Escanear pela câmera">
                     <ScanLine className="h-4 w-4" />
                   </Button>
                 </div>
@@ -291,23 +304,33 @@ const Products = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select value={editing.category_id ?? "none"} onValueChange={(v) => setEditing({ ...editing, category_id: v === "none" ? null : v })}>
-                  <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhuma</SelectItem>
-                    {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={editing.category_id ?? "none"} onValueChange={(v) => setEditing({ ...editing, category_id: v === "none" ? null : v })}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Nenhuma" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" size="icon" onClick={() => { setQuickName(""); setQuickCreate("category"); }} title="Nova categoria">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Fornecedor</Label>
-                <Select value={editing.supplier_id ?? "none"} onValueChange={(v) => setEditing({ ...editing, supplier_id: v === "none" ? null : v })}>
-                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {suppliers.map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={editing.supplier_id ?? "none"} onValueChange={(v) => setEditing({ ...editing, supplier_id: v === "none" ? null : v })}>
+                    <SelectTrigger className="flex-1"><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {suppliers.map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" size="icon" onClick={() => { setQuickName(""); setQuickCreate("supplier"); }} title="Novo fornecedor">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -341,6 +364,32 @@ const Products = () => {
             <Button onClick={save} disabled={createProduct.isPending || updateProduct.isPending}>
               {(createProduct.isPending || updateProduct.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {editingId ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mini-dialog de criação rápida */}
+      <Dialog open={quickCreate !== null} onOpenChange={(open) => { if (!open) setQuickCreate(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{quickCreate === "category" ? "Nova Categoria" : "Novo Fornecedor"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Nome *</Label>
+            <Input
+              value={quickName}
+              onChange={(e) => setQuickName(e.target.value)}
+              placeholder={quickCreate === "category" ? "Ex: Bebidas" : "Ex: Distribuidora XYZ"}
+              onKeyDown={(e) => { if (e.key === "Enter") saveQuickCreate(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickCreate(null)}>Cancelar</Button>
+            <Button onClick={saveQuickCreate} disabled={!quickName.trim() || createCategory.isPending || createSupplier.isPending}>
+              {(createCategory.isPending || createSupplier.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Criar
             </Button>
           </DialogFooter>
         </DialogContent>
