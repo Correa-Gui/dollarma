@@ -17,7 +17,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Camera } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -58,8 +59,11 @@ const Products = () => {
   const [quickCreate, setQuickCreate] = useState<"category" | "supplier" | null>(null);
   const [quickName, setQuickName] = useState("");
 
+  const [photoLoading, setPhotoLoading] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const generateSku = () => {
     const nums = products
@@ -76,6 +80,50 @@ const Products = () => {
     }
     setScannerOpen(false);
   }, []);
+
+  const analyzePhoto = async (file: File) => {
+    setPhotoLoading(true);
+    const toastId = toast.loading("Analisando foto com IA...");
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("analyze-product-photo", {
+        body: { imageBase64: base64, mediaType: file.type || "image/jpeg" },
+      });
+
+      if (error) throw error;
+
+      const name: string = data?.name ?? "";
+      const barcode: string = data?.barcode ?? "";
+
+      setEditing((prev) => ({
+        ...prev,
+        name: name || prev.name,
+        barcode: barcode || prev.barcode,
+      }));
+      setDialogOpen(true);
+      toast.success("Produto identificado! Revise e salve.", { id: toastId });
+    } catch (err) {
+      toast.error("Não foi possível analisar a foto.", { id: toastId });
+    } finally {
+      setPhotoLoading(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
+  const openPhotoCapture = () => {
+    setEditing({ ...emptyForm, sku: generateSku() });
+    setEditingId(null);
+    photoInputRef.current?.click();
+  };
 
   useEffect(() => {
     if (!scannerOpen || !videoRef.current) return;
@@ -180,7 +228,21 @@ const Products = () => {
           <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
           <p className="text-muted-foreground text-sm">{products.length} produtos cadastrados</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo Produto</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openPhotoCapture} disabled={photoLoading}>
+            {photoLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Camera className="h-4 w-4 mr-1" />}
+            Via Foto
+          </Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo Produto</Button>
+        </div>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) analyzePhoto(f); }}
+        />
       </div>
 
       <div className="flex flex-wrap gap-3">
