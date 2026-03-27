@@ -35,6 +35,7 @@ import UsersSettings from "./pages/settings/UsersSettings";
 import PlanoContas from "./pages/settings/PlanoContas";
 import ApiDocs from "./pages/settings/ApiDocs";
 import AuditLogPage from "./pages/audit/AuditLog";
+import Payables from "./pages/payables/Payables";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -87,6 +88,7 @@ const App = () => (
                 <Route path="/config/plano-contas" element={<PlanoContas />} />
                 <Route path="/config/api-docs" element={<ApiDocs />} />
                 <Route path="/auditoria" element={<AuditLogPage />} />
+                <Route path="/financeiro/contas-a-pagar" element={<Payables />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

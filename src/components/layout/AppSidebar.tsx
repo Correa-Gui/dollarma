@@ -34,6 +34,8 @@ import {
   FileUp,
   ShieldCheck,
   Receipt,
+  Landmark,
+  FileStack,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -87,6 +89,13 @@ const menuItems = [
       { title: "Movimentações", url: "/estoque/movimentacoes", icon: ArrowLeftRight },
       { title: "Inventário", url: "/estoque/inventario", icon: ClipboardList },
       { title: "Importar XML", url: "/estoque/importar-xml", icon: FileUp },
+    ],
+  },
+  {
+    title: "Financeiro",
+    icon: Landmark,
+    children: [
+      { title: "Contas a Pagar", url: "/financeiro/contas-a-pagar", icon: FileStack },
     ],
   },
   {
