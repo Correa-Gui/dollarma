@@ -141,13 +141,28 @@ const Products = () => {
       const name: string = data?.name ?? "";
       const barcode: string = data?.barcode ?? "";
 
+      // Busca NCM pelo código de barras automaticamente após a análise da foto
+      let ncmFromCosmos = "";
+      if (barcode && barcode.length >= 8) {
+        toast.loading("Buscando NCM pelo código de barras...", { id: toastId });
+        const cosmosResult = await fetchCosmosProduct(barcode);
+        if (cosmosResult?.ncm?.code) {
+          ncmFromCosmos = cosmosResult.ncm.code;
+        }
+      }
+
       setEditing((prev) => ({
         ...prev,
         name: name || prev.name,
         barcode: barcode || prev.barcode,
+        ncm: ncmFromCosmos || prev.ncm,
       }));
       setDialogOpen(true);
-      toast.success("Produto identificado! Revise e salve.", { id: toastId });
+
+      const successMsg = ncmFromCosmos
+        ? `Produto identificado! NCM preenchido: ${ncmFromCosmos}`
+        : "Produto identificado! Revise e salve.";
+      toast.success(successMsg, { id: toastId });
     } catch (err: any) {
       const msg = err?.message ?? err?.error_description ?? JSON.stringify(err) ?? "Erro desconhecido";
       console.error("[analyze-product-photo]", err);

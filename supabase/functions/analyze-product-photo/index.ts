@@ -8,9 +8,9 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
+    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     imageBase64 = body.imageBase64;
     mediaType = body.mediaType ?? "image/jpeg";
+    if (!imageBase64) throw new Error("imageBase64 is required");
   } catch {
     return new Response(JSON.stringify({ error: "Invalid request body" }), {
       status: 400,
@@ -30,45 +31,60 @@ Deno.serve(async (req) => {
     });
   }
 
-  const openaiPayload = {
-    model: "gpt-4o-mini",
-    max_tokens: 256,
+  const claudePayload = {
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 512,
     messages: [
       {
         role: "user",
         content: [
           {
-            type: "image_url",
-            image_url: { url: `data:${mediaType};base64,${imageBase64}` },
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mediaType,
+              data: imageBase64,
+            },
           },
           {
             type: "text",
-            text: 'Analise esta foto de produto. Retorne APENAS um JSON válido, sem markdown, com os campos: "name" (nome completo do produto, incluindo marca, ex: "Coca-Cola Lata 350ml") e "barcode" (código EAN/código de barras visível na embalagem como string, ou null se não visível). Exemplo: {"name":"Nescafé Tradicional 500g","barcode":"7891000315507"}',
+            text: `Analise esta foto de produto/embalagem e extraia as informações visíveis.
+Retorne APENAS um JSON válido, sem markdown, sem explicações, com os campos:
+- "name": nome completo do produto incluindo marca (ex: "Fratelli Conjunto Porta Molho e Petisco")
+- "barcode": código EAN/código de barras visível como string numérica (ou null se não visível)
+
+Regras:
+- Se houver marca visível, inclua-a no início do nome
+- O nome deve ser claro e descritivo para um sistema de estoque
+- O barcode deve ser apenas os dígitos, sem espaços
+
+Exemplo de resposta: {"name":"Fratelli Conjunto Porta Molho e Petisco","barcode":"7898008426730"}`,
           },
         ],
       },
     ],
   };
 
-  const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+  const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
     },
-    body: JSON.stringify(openaiPayload),
+    body: JSON.stringify(claudePayload),
   });
 
-  if (!openaiRes.ok) {
-    const err = await openaiRes.text();
-    return new Response(JSON.stringify({ error: `OpenAI API error: ${err}` }), {
+  if (!claudeRes.ok) {
+    const err = await claudeRes.text();
+    return new Response(JSON.stringify({ error: `Anthropic API error: ${err}` }), {
       status: 502,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const openaiData = await openaiRes.json();
-  const text: string = openaiData.choices?.[0]?.message?.content ?? "";
+  const claudeData = await claudeRes.json();
+  const text: string = claudeData.content?.[0]?.text ?? "";
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -79,9 +95,13 @@ Deno.serve(async (req) => {
 
   try {
     const result = JSON.parse(jsonMatch[0]);
-    return new Response(JSON.stringify({ name: result.name ?? "", barcode: result.barcode ?? null }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        name: result.name ?? "",
+        barcode: result.barcode ?? null,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch {
     return new Response(JSON.stringify({ name: "", barcode: null }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
