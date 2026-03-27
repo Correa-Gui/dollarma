@@ -22,7 +22,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Camera, Sparkles } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -67,7 +67,6 @@ const Products = () => {
   const [quickCreate, setQuickCreate] = useState<"category" | "supplier" | null>(null);
   const [quickName, setQuickName] = useState("");
 
-  const [photoLoading, setPhotoLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
 
@@ -86,7 +85,6 @@ const Products = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Lista de categorias ordenada hierarquicamente para o seletor do form
   const orderedCategories = useMemo(() => {
@@ -118,65 +116,22 @@ const Products = () => {
     setScannerOpen(false);
   }, []);
 
-  const analyzePhoto = async (file: File) => {
-    setPhotoLoading(true);
-    const toastId = toast.loading("Analisando foto com IA...");
-    try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const { data, error } = await supabase.functions.invoke("analyze-product-photo", {
-        body: { imageBase64: base64, mediaType: file.type || "image/jpeg" },
-      });
-
-      if (error) throw error;
-
-      const name: string = data?.name ?? "";
-      const barcode: string = data?.barcode ?? "";
-
-      // Busca NCM pelo código de barras automaticamente após a análise da foto
-      let ncmFromCosmos = "";
-      if (barcode && barcode.length >= 8) {
-        toast.loading("Buscando NCM pelo código de barras...", { id: toastId });
-        const cosmosResult = await fetchCosmosProduct(barcode);
-        if (cosmosResult?.ncm?.code) {
-          ncmFromCosmos = cosmosResult.ncm.code;
-        }
-      }
-
-      setEditing((prev) => ({
-        ...prev,
-        name: name || prev.name,
-        barcode: barcode || prev.barcode,
-        ncm: ncmFromCosmos || prev.ncm,
-      }));
-      setDialogOpen(true);
-
-      const successMsg = ncmFromCosmos
-        ? `Produto identificado! NCM preenchido: ${ncmFromCosmos}`
-        : "Produto identificado! Revise e salve.";
-      toast.success(successMsg, { id: toastId });
-    } catch (err: any) {
-      const msg = err?.message ?? err?.error_description ?? JSON.stringify(err) ?? "Erro desconhecido";
-      console.error("[analyze-product-photo]", err);
-      toast.error(`Erro: ${msg}`, { id: toastId });
-    } finally {
-      setPhotoLoading(false);
-      if (photoInputRef.current) photoInputRef.current.value = "";
+  // Busca nome + NCM no COSMOS e preenche o formulário
+  const enrichFromBarcode = async (ean: string) => {
+    if (!ean || ean.length < 8) return;
+    setEditing((prev) => ({ ...prev, ncm_loading: true }));
+    const result = await fetchCosmosProduct(ean);
+    setEditing((prev) => ({
+      ...prev,
+      ncm_loading: false,
+      name: !prev.name && result?.description ? result.description : prev.name,
+      ncm: !prev.ncm && result?.ncm?.code ? result.ncm.code : prev.ncm,
+    }));
+    if (result?.ncm?.code) {
+      toast.success(`COSMOS: NCM ${result.ncm.code}${result.description ? ` · ${result.description}` : ""}`);
+    } else if (result?.description) {
+      toast.info(`COSMOS: produto encontrado, sem NCM cadastrado.`);
     }
-  };
-
-  const openPhotoCapture = () => {
-    setEditing({ ...emptyForm, sku: generateSku() });
-    setEditingId(null);
-    photoInputRef.current?.click();
   };
 
   useEffect(() => {
@@ -190,8 +145,10 @@ const Products = () => {
       videoRef.current,
       (result, error) => {
         if (result) {
-          setEditing((prev) => ({ ...prev, barcode: result.getText() }));
+          const ean = result.getText();
+          setEditing((prev) => ({ ...prev, barcode: ean }));
           stopScanner();
+          enrichFromBarcode(ean);
         } else if (error && !(error instanceof NotFoundException)) {
           // NotFoundException é esperado entre frames sem código visível, ignorar
         }
@@ -238,21 +195,9 @@ const Products = () => {
     setDialogOpen(true);
   };
 
-  const handleBarcodeBlur = async (ean: string) => {
-    if (!ean || ean.length < 8) return;
-    if (editing.ncm) return; // não sobrescreve se já preenchido
-    setEditing((prev) => ({ ...prev, ncm_loading: true }));
-    const result = await fetchCosmosProduct(ean);
-    setEditing((prev) => ({
-      ...prev,
-      ncm_loading: false,
-      ncm: result?.ncm?.code ? result.ncm.code : prev.ncm,
-    }));
-    if (result?.ncm?.code) {
-      toast.success(`NCM preenchido: ${result.ncm.code}`);
-    } else if (result) {
-      toast.info("Produto encontrado no COSMOS, mas sem NCM cadastrado. Preencha manualmente.");
-    }
+  const handleBarcodeBlur = (ean: string) => {
+    if (editing.ncm && editing.name) return; // já preenchido, não sobrescreve
+    enrichFromBarcode(ean);
   };
 
   const handleBulkNcm = async () => {
@@ -402,20 +347,8 @@ const Products = () => {
               : <><Sparkles className="h-4 w-4 mr-1" />Enriquecer NCM</>
             }
           </Button>
-          <Button variant="outline" onClick={openPhotoCapture} disabled={photoLoading}>
-            {photoLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Camera className="h-4 w-4 mr-1" />}
-            Via Foto
-          </Button>
           <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo Produto</Button>
         </div>
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) analyzePhoto(f); }}
-        />
       </div>
 
       <div className="flex flex-wrap gap-3">
