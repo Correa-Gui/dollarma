@@ -36,6 +36,9 @@ import PlanoContas from "./pages/settings/PlanoContas";
 import ApiDocs from "./pages/settings/ApiDocs";
 import AuditLogPage from "./pages/audit/AuditLog";
 import Payables from "./pages/payables/Payables";
+import Balancete from "./pages/financeiro/Balancete";
+import PosicaoFinanceira from "./pages/financeiro/PosicaoFinanceira";
+import PriceHistory from "./pages/reports/PriceHistory";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -89,6 +92,9 @@ const App = () => (
                 <Route path="/config/api-docs" element={<ApiDocs />} />
                 <Route path="/auditoria" element={<AuditLogPage />} />
                 <Route path="/financeiro/contas-a-pagar" element={<Payables />} />
+                <Route path="/financeiro/balancete" element={<Balancete />} />
+                <Route path="/financeiro/posicao-financeira" element={<PosicaoFinanceira />} />
+                <Route path="/relatorios/historico-precos" element={<PriceHistory />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

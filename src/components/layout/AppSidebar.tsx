@@ -96,6 +96,8 @@ const menuItems = [
     icon: Landmark,
     children: [
       { title: "Contas a Pagar", url: "/financeiro/contas-a-pagar", icon: FileStack },
+      { title: "Balancete", url: "/financeiro/balancete", icon: BarChart2 },
+      { title: "Posição Financeira", url: "/financeiro/posicao-financeira", icon: TrendingUp },
     ],
   },
   {
@@ -114,6 +116,7 @@ const menuItems = [
       { title: "Giro de Estoque", url: "/relatorios/giro-estoque", icon: RefreshCw },
       { title: "Caixa Diário", url: "/relatorios/caixa", icon: Wallet },
       { title: "Notas Fiscais", url: "/relatorios/notas-fiscais", icon: Receipt },
+      { title: "Histórico de Preços", url: "/relatorios/historico-precos", icon: History },
     ],
   },
   {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useFiscalReport } from "@/hooks/useFiscalReport";
+import { useStoreSettings } from "@/hooks/useStoreSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ const FiscalReport = () => {
   const [to, setTo] = useState(today);
 
   const { data: sales = [], isLoading } = useFiscalReport(from, to);
+  const { data: settings } = useStoreSettings();
 
   const grandTotal = sales.reduce((s, v) => s + Number(v.total), 0);
 
@@ -75,10 +77,15 @@ const FiscalReport = () => {
         <div id="fiscal-report-content" className="print:text-black print:bg-white">
           {/* Cabeçalho da empresa */}
           <div className="border-b pb-4 mb-4 print:mb-6">
-            <div className="font-bold text-lg uppercase tracking-wide">DOLLAR BRASIL — CLAUDEMIR BATISTA SANTOS - ME</div>
+            <div className="font-bold text-lg uppercase tracking-wide">{settings?.store_name ?? "—"}</div>
             <div className="text-sm text-muted-foreground print:text-black">
-              RUA DR. RODRIGUES ALVES, 870 · CEP 15.820-000 · PIRANGI - SP
+              {settings?.address ?? "—"}
             </div>
+            {settings?.cnpj && (
+              <div className="text-sm text-muted-foreground print:text-black">
+                CNPJ: {settings.cnpj}
+              </div>
+            )}
           </div>
 
           {/* Título do relatório */}

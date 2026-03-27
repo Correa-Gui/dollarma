@@ -6,8 +6,11 @@ import { NotFoundException } from "@zxing/library";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useCategories, useCreateCategory } from "@/hooks/useCategories";
 import { useSuppliers, useCreateSupplier } from "@/hooks/useSuppliers";
+import { logAudit } from "@/hooks/useAuditLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -67,6 +70,19 @@ const Products = () => {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+
+  // Alteração em massa
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionOpen, setBulkActionOpen] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkAction, setBulkAction] = useState<"price" | "status" | "category" | null>(null);
+  const [bulkPriceMode, setBulkPriceMode] = useState<"percent" | "fixed">("percent");
+  const [bulkPriceDirection, setBulkPriceDirection] = useState<"increase" | "decrease">("increase");
+  const [bulkPriceValue, setBulkPriceValue] = useState("");
+  const [bulkStatusValue, setBulkStatusValue] = useState(true);
+  const [bulkCategoryId, setBulkCategoryId] = useState<string | null>(null);
+  const [bulkEditProgress, setBulkEditProgress] = useState({ done: 0, total: 0 });
+  const [bulkEditLoading, setBulkEditLoading] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -132,8 +148,10 @@ const Products = () => {
       }));
       setDialogOpen(true);
       toast.success("Produto identificado! Revise e salve.", { id: toastId });
-    } catch (err) {
-      toast.error("Não foi possível analisar a foto.", { id: toastId });
+    } catch (err: any) {
+      const msg = err?.message ?? err?.error_description ?? JSON.stringify(err) ?? "Erro desconhecido";
+      console.error("[analyze-product-photo]", err);
+      toast.error(`Erro: ${msg}`, { id: toastId });
     } finally {
       setPhotoLoading(false);
       if (photoInputRef.current) photoInputRef.current.value = "";
@@ -248,6 +266,71 @@ const Products = () => {
     setBulkProgress({ done: 0, total: 0 });
   };
 
+  const bulkActionLabel = () => {
+    if (bulkAction === "price") {
+      const dir = bulkPriceDirection === "increase" ? "Aumentar" : "Diminuir";
+      const mode = bulkPriceMode === "percent" ? "%" : "R$";
+      return `${dir} preço de venda em ${bulkPriceValue || "0"}${mode}`;
+    }
+    if (bulkAction === "status") return bulkStatusValue ? "Ativar produtos" : "Inativar produtos";
+    if (bulkAction === "category") {
+      const cat = orderedCategories.find((c) => c.id === bulkCategoryId);
+      return `Alterar categoria para: ${cat?.name ?? "Nenhuma"}`;
+    }
+    return "";
+  };
+
+  const executeBulkEdit = async () => {
+    const toProcess = filtered.filter((p) => selectedIds.has(p.id));
+    setBulkEditLoading(true);
+    setBulkEditProgress({ done: 0, total: toProcess.length });
+    setBulkConfirmOpen(false);
+
+    for (const product of toProcess) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let updates: Record<string, any> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let auditChanges: Record<string, any> = {};
+
+      if (bulkAction === "price") {
+        const currentPrice = Number(product.sale_price);
+        const numericVal = parseFloat(bulkPriceValue.replace(",", ".")) || 0;
+        let newPrice: number;
+        if (bulkPriceMode === "percent") {
+          newPrice = bulkPriceDirection === "increase"
+            ? currentPrice * (1 + numericVal / 100)
+            : currentPrice * (1 - numericVal / 100);
+        } else {
+          newPrice = bulkPriceDirection === "increase"
+            ? currentPrice + numericVal
+            : currentPrice - numericVal;
+        }
+        newPrice = Math.max(0, Math.round(newPrice * 100) / 100);
+        updates = { sale_price: newPrice };
+        auditChanges = { sale_price: { from: currentPrice, to: newPrice } };
+      } else if (bulkAction === "status") {
+        updates = { is_active: bulkStatusValue };
+        auditChanges = { is_active: bulkStatusValue };
+      } else if (bulkAction === "category") {
+        updates = { category_id: bulkCategoryId };
+        auditChanges = { category_id: bulkCategoryId };
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("products").update(updates).eq("id", product.id);
+      logAudit("product", product.id, product.name, "update", auditChanges);
+      setBulkEditProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+    }
+
+    qc.invalidateQueries({ queryKey: ["products"] });
+    setSelectedIds(new Set());
+    setBulkEditLoading(false);
+    setBulkEditProgress({ done: 0, total: 0 });
+    setBulkAction(null);
+    setBulkPriceValue("");
+    toast.success(`${toProcess.length} produto(s) atualizados com sucesso.`);
+  };
+
   const save = async () => {
     if (!editing.name) return;
     const salePrice = fromInput(editing.sale_price);
@@ -342,6 +425,18 @@ const Products = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedIds(new Set(filtered.map((p) => p.id)));
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                />
+              </TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Categoria</TableHead>
@@ -361,6 +456,18 @@ const Products = () => {
               const m = cost > 0 ? (((sale - cost) / cost) * 100).toFixed(1) : "0.0";
               return (
                 <TableRow key={p.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(p.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.add(p.id); else next.delete(p.id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{p.categories?.name ?? "—"}</TableCell>
@@ -383,11 +490,117 @@ const Products = () => {
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Barra de ação flutuante para bulk edit */}
+      {selectedIds.size > 0 && !bulkEditLoading && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
+          <Badge variant="secondary">{selectedIds.size} produto(s)</Badge>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("price"); setBulkActionOpen(true); }}>Alterar Preço</Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("status"); setBulkActionOpen(true); }}>Alterar Status</Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("category"); setBulkCategoryId(null); setBulkActionOpen(true); }}>Alterar Categoria</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}><X className="h-4 w-4" /></Button>
+        </div>
+      )}
+      {bulkEditLoading && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Atualizando {bulkEditProgress.done}/{bulkEditProgress.total}...</span>
+        </div>
+      )}
+
+      {/* Dialog de ação em massa */}
+      <Dialog open={bulkActionOpen} onOpenChange={setBulkActionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Ação em Massa — {selectedIds.size} produto(s)</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            {bulkAction === "price" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Modo</Label>
+                  <Select value={bulkPriceMode} onValueChange={(v) => setBulkPriceMode(v as "percent" | "fixed")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percent">Porcentagem (%)</SelectItem>
+                      <SelectItem value="fixed">Valor fixo (R$)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Direção</Label>
+                  <Select value={bulkPriceDirection} onValueChange={(v) => setBulkPriceDirection(v as "increase" | "decrease")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="increase">Aumentar</SelectItem>
+                      <SelectItem value="decrease">Diminuir</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor ({bulkPriceMode === "percent" ? "%" : "R$"})</Label>
+                  <Input
+                    value={bulkPriceValue}
+                    onChange={(e) => setBulkPriceValue(e.target.value)}
+                    placeholder={bulkPriceMode === "percent" ? "Ex: 10" : "Ex: 5,00"}
+                    inputMode="decimal"
+                  />
+                </div>
+              </>
+            )}
+            {bulkAction === "status" && (
+              <div className="space-y-2">
+                <Label>Novo Status</Label>
+                <Select value={bulkStatusValue ? "true" : "false"} onValueChange={(v) => setBulkStatusValue(v === "true")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Ativo</SelectItem>
+                    <SelectItem value="false">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {bulkAction === "category" && (
+              <div className="space-y-2">
+                <Label>Nova Categoria</Label>
+                <Select value={bulkCategoryId ?? "none"} onValueChange={(v) => setBulkCategoryId(v === "none" ? null : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {orderedCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.parent_id ? `└ ${c.name}` : c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkActionOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { setBulkActionOpen(false); setBulkConfirmOpen(true); }}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação bulk */}
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Confirmar Alteração</DialogTitle></DialogHeader>
+          <div className="py-2 space-y-1 text-sm">
+            <p>{bulkActionLabel()}</p>
+            <p className="text-muted-foreground">Será aplicado em <strong>{selectedIds.size}</strong> produto(s).</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={executeBulkEdit}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Scanner de câmera */}
       {scannerOpen && (
