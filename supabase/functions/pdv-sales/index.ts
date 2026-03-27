@@ -76,22 +76,49 @@ Deno.serve(async (req) => {
   const saleItems: any[] = [];
 
   for (const item of items) {
-    if (!item.product_id || !item.quantity || item.quantity <= 0) {
+    if ((!item.product_id && !item.barcode && !item.sku) || !item.quantity || item.quantity <= 0) {
       return new Response(
-        JSON.stringify({ error: "Each item needs product_id and quantity > 0" }),
+        JSON.stringify({ error: "Each item needs product_id (or barcode/sku) and quantity > 0" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: product } = await supabase
-      .from("products")
-      .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
-      .eq("id", item.product_id)
-      .single();
+    let product: any = null;
+
+    // Tenta por UUID primeiro
+    if (item.product_id) {
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .eq("id", item.product_id)
+        .maybeSingle();
+      product = data;
+    }
+
+    // Fallback por barcode
+    if (!product && item.barcode) {
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .eq("barcode", item.barcode)
+        .maybeSingle();
+      product = data;
+    }
+
+    // Fallback por SKU
+    if (!product && item.sku) {
+      const { data } = await supabase
+        .from("products")
+        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .eq("sku", item.sku)
+        .maybeSingle();
+      product = data;
+    }
 
     if (!product) {
+      const identifier = item.barcode ?? item.sku ?? item.product_id;
       return new Response(
-        JSON.stringify({ error: `Product ${item.product_id} not found` }),
+        JSON.stringify({ error: `Product not found: ${identifier}` }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

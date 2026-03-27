@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useStockMovements, useCreateStockMovement } from "@/hooks/useStockMovements";
 import { useProducts } from "@/hooks/useProducts";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { NotFoundException } from "@zxing/library";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
@@ -15,7 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, ScanLine, X } from "lucide-react";
+import { toast } from "sonner";
 
 const typeLabels: Record<string, string> = {
   purchase: "Entrada", sale: "Saída", adjustment_in: "Ajuste +",
@@ -40,6 +43,52 @@ const Movements = () => {
     quantity: 1,
     reason: "",
   });
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  const stopScanner = useCallback(() => {
+    if (readerRef.current) {
+      BrowserMultiFormatReader.releaseAllStreams();
+      readerRef.current = null;
+    }
+    setScannerOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!scannerOpen || !videoRef.current) return;
+
+    const reader = new BrowserMultiFormatReader();
+    readerRef.current = reader;
+
+    reader.decodeFromConstraints(
+      { video: { facingMode: "environment" } },
+      videoRef.current,
+      (result, error) => {
+        if (result) {
+          const ean = result.getText();
+          const found = products.find((p) => p.barcode === ean);
+          if (found) {
+            setNewMov((prev) => ({ ...prev, product_id: found.id }));
+            toast.success(`Produto encontrado: ${found.name}`);
+          } else {
+            toast.warning(`Código ${ean} não encontrado no estoque.`);
+          }
+          stopScanner();
+        } else if (error && !(error instanceof NotFoundException)) {
+          // NotFoundException é esperado entre frames sem código visível
+        }
+      }
+    ).catch(() => {
+      toast.error("Não foi possível acessar a câmera.");
+      stopScanner();
+    });
+
+    return () => {
+      BrowserMultiFormatReader.releaseAllStreams();
+      readerRef.current = null;
+    };
+  }, [scannerOpen, stopScanner, products]);
 
   const filtered = filterType === "all" ? movements : movements.filter((m) => m.type === filterType);
 
@@ -111,18 +160,39 @@ const Movements = () => {
         </Table>
       </div>
 
+      {/* Scanner de câmera */}
+      {scannerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center gap-4">
+          <video ref={videoRef} className="w-full max-w-sm rounded-lg" />
+          <Button variant="outline" onClick={stopScanner}>
+            <X className="h-4 w-4 mr-1" /> Cancelar
+          </Button>
+        </div>
+      )}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Ajuste Manual de Estoque</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
               <Label>Produto</Label>
-              <Select value={newMov.product_id} onValueChange={(v) => setNewMov({ ...newMov, product_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={newMov.product_id} onValueChange={(v) => setNewMov({ ...newMov, product_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {products.map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setScannerOpen(true)}
+                  title="Escanear código de barras"
+                >
+                  <ScanLine className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
