@@ -225,9 +225,10 @@ const endpoints: EndpointProps[] = [
     requestBody: JSON.stringify({
       session_id: "uuid-da-sessao-aberta",
       payment_method: "pix",
+      customer_id: "uuid-do-cliente (opcional)",
       items: [
         { product_id: "a1b2c3d4-...", quantity: 2 },
-        { product_id: "e5f6g7h8-...", quantity: 1 },
+        { product_id: "e5f6g7h8-...", quantity: 1, barcode: "7891234567890" },
       ],
     }, null, 2),
     responses: [
@@ -259,9 +260,110 @@ const endpoints: EndpointProps[] = [
   -d '{
     "session_id": "uuid-da-sessao",
     "payment_method": "pix",
+    "customer_id": "uuid-do-cliente",
     "items": [
-      { "product_id": "a1b2c3d4-...", "quantity": 2 }
+      { "product_id": "a1b2c3d4-...", "quantity": 2 },
+      { "barcode": "7891234567890", "quantity": 1 }
     ]
+  }'`,
+  },
+  {
+    method: "GET",
+    path: "/pdv-customers",
+    title: "Buscar Clientes",
+    description: "Retorna a lista de clientes cadastrados. Use o parâmetro 'search' para filtrar por nome, CPF, telefone ou e-mail. Limite máximo de 200 registros por requisição.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+    ],
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          customers: [
+            {
+              id: "a1b2c3d4-...",
+              name: "Maria Silva",
+              cpf: "123.456.789-00",
+              phone: "(11) 99999-9999",
+              email: "maria@email.com",
+              address: "Rua das Flores, 10",
+              notes: null,
+              created_at: "2026-01-15T10:00:00Z",
+            },
+          ],
+          total: 1,
+        }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `# Listar todos
+curl -X GET \\
+  "${BASE_URL}/pdv-customers" \\
+  -H "x-pdv-token: tk_live_abc123def456"
+
+# Buscar por nome, CPF ou telefone
+curl -X GET \\
+  "${BASE_URL}/pdv-customers?search=Maria&limit=20" \\
+  -H "x-pdv-token: tk_live_abc123def456"`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-customers",
+    title: "Criar Cliente",
+    description: "Cadastra um novo cliente diretamente pelo PDV. O nome é obrigatório. Se o CPF já estiver cadastrado, retorna 409 com o ID do cliente existente.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      name: "Maria Silva",
+      cpf: "123.456.789-00",
+      phone: "(11) 99999-9999",
+      email: "maria@email.com",
+      address: "Rua das Flores, 10",
+      notes: "Cliente preferencial",
+    }, null, 2),
+    responses: [
+      {
+        status: 201,
+        label: "Criado",
+        body: JSON.stringify({
+          customer: {
+            id: "a1b2c3d4-...",
+            name: "Maria Silva",
+            cpf: "123.456.789-00",
+            phone: "(11) 99999-9999",
+            email: "maria@email.com",
+            address: "Rua das Flores, 10",
+            notes: "Cliente preferencial",
+            created_at: "2026-03-27T10:00:00Z",
+          },
+        }, null, 2),
+      },
+      {
+        status: 409,
+        label: "CPF duplicado",
+        body: JSON.stringify({ error: "CPF já cadastrado para: João Silva", existing_id: "uuid-existente" }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "name is required" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-customers \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Maria Silva",
+    "cpf": "123.456.789-00",
+    "phone": "(11) 99999-9999"
   }'`,
   },
   {

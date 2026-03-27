@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { payment_method, items, session_id } = body;
+  const { payment_method, items, session_id, customer_id } = body;
 
   if (!payment_method || !Array.isArray(items) || items.length === 0) {
     return new Response(
@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
       total,
       status: "completed",
       sold_at: new Date().toISOString(),
+      ...(customer_id ? { customer_id } : {}),
     })
     .select("id, sale_number")
     .single();
