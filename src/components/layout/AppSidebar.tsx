@@ -33,6 +33,7 @@ import {
   UserRound,
   FileUp,
   ShieldCheck,
+  Receipt,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ const menuItems = [
       { title: "Ticket × Pagamento", url: "/relatorios/ticket-pagamento", icon: CreditCard },
       { title: "Giro de Estoque", url: "/relatorios/giro-estoque", icon: RefreshCw },
       { title: "Caixa Diário", url: "/relatorios/caixa", icon: Wallet },
+      { title: "Notas Fiscais", url: "/relatorios/notas-fiscais", icon: Receipt },
     ],
   },
   {

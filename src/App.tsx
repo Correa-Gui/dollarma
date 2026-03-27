@@ -28,6 +28,7 @@ import CategoryAnalysis from "./pages/reports/CategoryAnalysis";
 import AbcCurve from "./pages/reports/AbcCurve";
 import TicketByPayment from "./pages/reports/TicketByPayment";
 import StockTurnover from "./pages/reports/StockTurnover";
+import FiscalReport from "./pages/reports/FiscalReport";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
@@ -79,6 +80,7 @@ const App = () => (
                 <Route path="/relatorios/ticket-pagamento" element={<TicketByPayment />} />
                 <Route path="/relatorios/giro-estoque" element={<StockTurnover />} />
                 <Route path="/relatorios/caixa" element={<CashRegister />} />
+                <Route path="/relatorios/notas-fiscais" element={<FiscalReport />} />
                 <Route path="/config/geral" element={<GeneralSettings />} />
                 <Route path="/config/pdv" element={<PdvSettings />} />
                 <Route path="/config/usuarios" element={<UsersSettings />} />

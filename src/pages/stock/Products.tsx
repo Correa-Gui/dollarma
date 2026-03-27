@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { fetchCosmosProduct } from "@/services/cosmos";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { NotFoundException } from "@zxing/library";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
@@ -27,6 +28,7 @@ type ProductForm = {
   cost_price: string; sale_price: string;
   stock_quantity: number; min_stock: number; unit: string; is_active: boolean;
   category_id: string | null; supplier_id: string | null;
+  ncm: string; ncm_loading: boolean;
 };
 
 const toInput = (n: number) => (n === 0 ? "" : String(n).replace(".", ","));
@@ -36,6 +38,7 @@ const emptyForm: ProductForm = {
   name: "", sku: "", barcode: "", cost_price: "", sale_price: "",
   stock_quantity: 0, min_stock: 0, unit: "un", is_active: true,
   category_id: null, supplier_id: null,
+  ncm: "", ncm_loading: false,
 };
 
 const Products = () => {
@@ -191,16 +194,35 @@ const Products = () => {
       stock_quantity: p.stock_quantity, min_stock: p.min_stock,
       unit: p.unit, is_active: p.is_active,
       category_id: p.category_id, supplier_id: p.supplier_id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ncm: (p as any).ncm ?? "", ncm_loading: false,
     });
     setEditingId(p.id);
     setDialogOpen(true);
+  };
+
+  const handleBarcodeBlur = async (ean: string) => {
+    if (!ean || ean.length < 8) return;
+    if (editing.ncm) return; // não sobrescreve se já preenchido
+    setEditing((prev) => ({ ...prev, ncm_loading: true }));
+    const result = await fetchCosmosProduct(ean);
+    setEditing((prev) => ({
+      ...prev,
+      ncm_loading: false,
+      ncm: result?.ncm?.code ? result.ncm.code : prev.ncm,
+    }));
+    if (result?.ncm?.code) {
+      toast.success(`NCM preenchido: ${result.ncm.code}`);
+    }
   };
 
   const save = async () => {
     if (!editing.name) return;
     const salePrice = fromInput(editing.sale_price);
     const costPrice = fromInput(editing.cost_price) || salePrice;
-    const payload = { ...editing, cost_price: costPrice, sale_price: salePrice };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { ncm_loading, ...rest } = editing;
+    const payload = { ...rest, cost_price: costPrice, sale_price: salePrice, ncm: rest.ncm || null };
     if (editingId) {
       await updateProduct.mutateAsync({ id: editingId, ...payload });
     } else {
@@ -285,6 +307,7 @@ const Products = () => {
               <TableHead>SKU</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Categoria</TableHead>
+              <TableHead>NCM</TableHead>
               <TableHead className="text-right">Custo</TableHead>
               <TableHead className="text-right">Venda</TableHead>
               <TableHead className="text-right">Margem</TableHead>
@@ -303,6 +326,8 @@ const Products = () => {
                   <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{p.categories?.name ?? "—"}</TableCell>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  <TableCell className="font-mono text-xs">{(p as any).ncm ?? "—"}</TableCell>
                   <TableCell className="text-right">{cost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                   <TableCell className="text-right">{sale.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                   <TableCell className="text-right">{m}%</TableCell>
@@ -320,7 +345,7 @@ const Products = () => {
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum produto encontrado</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -361,6 +386,7 @@ const Products = () => {
                   <Input
                     value={editing.barcode}
                     onChange={(e) => setEditing({ ...editing, barcode: e.target.value })}
+                    onBlur={(e) => handleBarcodeBlur(e.target.value)}
                     placeholder="Digite ou escaneie"
                     className="flex-1"
                   />
@@ -442,6 +468,21 @@ const Products = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Estoque Atual</Label><Input type="number" value={editing.stock_quantity} onChange={(e) => setEditing({ ...editing, stock_quantity: +e.target.value })} /></div>
               <div className="space-y-2"><Label>Estoque Mínimo</Label><Input type="number" value={editing.min_stock} onChange={(e) => setEditing({ ...editing, min_stock: +e.target.value })} /></div>
+            </div>
+            <div className="space-y-2">
+              <Label>NCM</Label>
+              <div className="relative">
+                <Input
+                  value={editing.ncm}
+                  onChange={(e) => setEditing({ ...editing, ncm: e.target.value })}
+                  placeholder="Ex: 22021000 (preenchido automaticamente via código de barras)"
+                  maxLength={8}
+                  className="font-mono"
+                />
+                {editing.ncm_loading && (
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
             </div>
           </div>
           <DialogFooter>

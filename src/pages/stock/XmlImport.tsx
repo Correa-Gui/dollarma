@@ -18,6 +18,7 @@ type XmlSupplier = { cnpj: string; name: string };
 type ImportItem = {
   ean: string;
   xmlName: string;
+  ncm: string;
   qty: number;
   cost: number;
   unit: string;
@@ -90,6 +91,7 @@ const XmlImport = () => {
 
       const ean = getTag(prodEl, "cEAN");
       const xmlName = getTag(prodEl, "xProd");
+      const ncm = getTag(prodEl, "NCM");
       const qty = parseFloat(getTag(prodEl, "qCom").replace(",", ".")) || 0;
       const cost = parseFloat(getTag(prodEl, "vUnCom").replace(",", ".")) || 0;
       const unit = normalizeUnit(getTag(prodEl, "uCom"));
@@ -102,6 +104,7 @@ const XmlImport = () => {
       parsedItems.push({
         ean,
         xmlName,
+        ncm,
         qty,
         cost,
         unit,
@@ -178,6 +181,11 @@ const XmlImport = () => {
             if (item.updateCost) {
               await supabase.from("products").update({ cost_price: item.cost }).eq("id", item.existingId);
             }
+            // Backfill NCM se produto ainda não tem
+            if (item.ncm) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).from("products").update({ ncm: item.ncm }).eq("id", item.existingId).is("ncm", null);
+            }
             if (item.addStock && item.qty > 0) {
               const newQty = item.existingStock + item.qty;
               await supabase.from("stock_movements").insert({
@@ -194,7 +202,7 @@ const XmlImport = () => {
           } else {
             // Produto novo
             const sku = String(skuCounter++).padStart(6, "0");
-            const { data: newProduct, error } = await supabase.from("products").insert({
+            const { data: newProduct, error } = await (supabase as any).from("products").insert({
               name: item.xmlName,
               sku,
               barcode: item.ean && item.ean !== "SEM GTIN" ? item.ean : null,
@@ -205,7 +213,8 @@ const XmlImport = () => {
               unit: item.unit,
               supplier_id: supplierId,
               is_active: true,
-            } as TablesInsert<"products">).select().single();
+              ncm: item.ncm || null,
+            }).select().single();
 
             if (error || !newProduct) {
               errors++;
@@ -344,6 +353,7 @@ const XmlImport = () => {
               <TableHead>Status</TableHead>
               <TableHead>EAN</TableHead>
               <TableHead>Nome no XML</TableHead>
+              <TableHead>NCM</TableHead>
               <TableHead className="text-right">Qtd</TableHead>
               <TableHead className="text-right">Custo Unit.</TableHead>
               <TableHead className="text-center">Atualizar custo</TableHead>
@@ -371,6 +381,7 @@ const XmlImport = () => {
                     <div className="text-xs text-muted-foreground">Cadastrado: {item.existingName}</div>
                   )}
                 </TableCell>
+                <TableCell className="font-mono text-xs">{item.ncm || "—"}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.qty}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(item.cost)}</TableCell>
                 <TableCell className="text-center">
