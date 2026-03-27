@@ -213,6 +213,8 @@ const Products = () => {
     }));
     if (result?.ncm?.code) {
       toast.success(`NCM preenchido: ${result.ncm.code}`);
+    } else if (result) {
+      toast.info("Produto encontrado no COSMOS, mas sem NCM cadastrado. Preencha manualmente.");
     }
   };
 
