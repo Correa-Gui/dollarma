@@ -1,4 +1,4 @@
-project_id = "lyrsqjzsbtxtmyfpjbhv"
+project_id = "loxnabrusfaezywloery"
 
 [functions.pdv-cash-register]
 verify_jwt = false
