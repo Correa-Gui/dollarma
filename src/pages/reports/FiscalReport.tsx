@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useFiscalReport, deriveCfop } from "@/hooks/useFiscalReport";
+import { useFiscalReport } from "@/hooks/useFiscalReport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,7 +99,6 @@ const FiscalReport = () => {
           ) : (
             <div className="space-y-6">
               {sales.map((sale) => {
-                const cfop = deriveCfop(sale.origin);
                 const st = statusLabel(sale.status);
                 return (
                   <div key={sale.id} className="border rounded-lg overflow-hidden print:border-gray-400 print:rounded-none print-page-break">
@@ -136,6 +135,7 @@ const FiscalReport = () => {
                         {sale.sale_items.map((item) => {
                           const ncm = item.ncm_code ?? item.products?.ncm ?? "—";
                           const sku = item.product_sku ?? item.products?.sku ?? "—";
+                          const cfop = item.products?.cfop ?? "5102";
                           return (
                             <tr key={item.id} className="border-b last:border-0">
                               <td className="px-4 py-1.5 font-mono text-xs">{sku}</td>

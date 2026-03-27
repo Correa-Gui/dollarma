@@ -9,7 +9,7 @@ export type FiscalSaleItem = {
   quantity: number;
   unit_price: number;
   subtotal: number;
-  products: { ncm: string | null; sku: string } | null;
+  products: { ncm: string | null; sku: string; cfop: string | null } | null;
 };
 
 export type FiscalSale = {
@@ -43,7 +43,7 @@ export function useFiscalReport(from: string, to: string) {
           customers(name, cpf),
           sale_items(
             id, product_name, product_sku, ncm_code, quantity, unit_price, subtotal,
-            products(ncm, sku)
+            products(ncm, sku, cfop)
           )
         `)
         .gte("sold_at", from + "T00:00:00.000Z")

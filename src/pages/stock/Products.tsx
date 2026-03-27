@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetchCosmosProduct } from "@/services/cosmos";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { NotFoundException } from "@zxing/library";
@@ -18,7 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Camera } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Camera, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -28,7 +29,7 @@ type ProductForm = {
   cost_price: string; sale_price: string;
   stock_quantity: number; min_stock: number; unit: string; is_active: boolean;
   category_id: string | null; supplier_id: string | null;
-  ncm: string; ncm_loading: boolean;
+  ncm: string; ncm_loading: boolean; cfop: string;
 };
 
 const toInput = (n: number) => (n === 0 ? "" : String(n).replace(".", ","));
@@ -38,7 +39,7 @@ const emptyForm: ProductForm = {
   name: "", sku: "", barcode: "", cost_price: "", sale_price: "",
   stock_quantity: 0, min_stock: 0, unit: "un", is_active: true,
   category_id: null, supplier_id: null,
-  ncm: "", ncm_loading: false,
+  ncm: "", ncm_loading: false, cfop: "5102",
 };
 
 const Products = () => {
@@ -50,6 +51,7 @@ const Products = () => {
   const deleteProduct = useDeleteProduct();
   const createCategory = useCreateCategory();
   const createSupplier = useCreateSupplier();
+  const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
@@ -63,6 +65,8 @@ const Products = () => {
   const [quickName, setQuickName] = useState("");
 
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -195,7 +199,7 @@ const Products = () => {
       unit: p.unit, is_active: p.is_active,
       category_id: p.category_id, supplier_id: p.supplier_id,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ncm: (p as any).ncm ?? "", ncm_loading: false,
+      ncm: (p as any).ncm ?? "", ncm_loading: false, cfop: (p as any).cfop ?? "5102",
     });
     setEditingId(p.id);
     setDialogOpen(true);
@@ -218,13 +222,39 @@ const Products = () => {
     }
   };
 
+  const handleBulkNcm = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toEnrich = products.filter((p) => p.barcode && !(p as any).ncm);
+    if (toEnrich.length === 0) {
+      toast.info("Todos os produtos com código de barras já têm NCM.");
+      return;
+    }
+    setBulkLoading(true);
+    setBulkProgress({ done: 0, total: toEnrich.length });
+    let updated = 0;
+    for (const product of toEnrich) {
+      const result = await fetchCosmosProduct(product.barcode!);
+      if (result?.ncm?.code) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("products").update({ ncm: result.ncm.code }).eq("id", product.id);
+        updated++;
+      }
+      setBulkProgress((prev) => ({ ...prev, done: prev.done + 1 }));
+      await new Promise((r) => setTimeout(r, 350)); // evitar rate limit
+    }
+    qc.invalidateQueries({ queryKey: ["products"] });
+    toast.success(`NCM enriquecido: ${updated} de ${toEnrich.length} produto(s) atualizados.`);
+    setBulkLoading(false);
+    setBulkProgress({ done: 0, total: 0 });
+  };
+
   const save = async () => {
     if (!editing.name) return;
     const salePrice = fromInput(editing.sale_price);
     const costPrice = fromInput(editing.cost_price) || salePrice;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { ncm_loading, ...rest } = editing;
-    const payload = { ...rest, cost_price: costPrice, sale_price: salePrice, ncm: rest.ncm || null };
+    const payload = { ...rest, cost_price: costPrice, sale_price: salePrice, ncm: rest.ncm || null, cfop: rest.cfop || "5102" };
     if (editingId) {
       await updateProduct.mutateAsync({ id: editingId, ...payload });
     } else {
@@ -268,6 +298,12 @@ const Products = () => {
           <p className="text-muted-foreground text-sm">{products.length} produtos cadastrados</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleBulkNcm} disabled={bulkLoading || isLoading}>
+            {bulkLoading
+              ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />{bulkProgress.done}/{bulkProgress.total}</>
+              : <><Sparkles className="h-4 w-4 mr-1" />Enriquecer NCM</>
+            }
+          </Button>
           <Button variant="outline" onClick={openPhotoCapture} disabled={photoLoading}>
             {photoLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Camera className="h-4 w-4 mr-1" />}
             Via Foto
@@ -471,19 +507,33 @@ const Products = () => {
               <div className="space-y-2"><Label>Estoque Atual</Label><Input type="number" value={editing.stock_quantity} onChange={(e) => setEditing({ ...editing, stock_quantity: +e.target.value })} /></div>
               <div className="space-y-2"><Label>Estoque Mínimo</Label><Input type="number" value={editing.min_stock} onChange={(e) => setEditing({ ...editing, min_stock: +e.target.value })} /></div>
             </div>
-            <div className="space-y-2">
-              <Label>NCM</Label>
-              <div className="relative">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>NCM</Label>
+                <div className="relative">
+                  <Input
+                    value={editing.ncm}
+                    onChange={(e) => setEditing({ ...editing, ncm: e.target.value })}
+                    placeholder="Ex: 22021000"
+                    maxLength={8}
+                    className="font-mono"
+                  />
+                  {editing.ncm_loading && (
+                    <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Preenchido via código de barras (COSMOS)</p>
+              </div>
+              <div className="space-y-2">
+                <Label>CFOP</Label>
                 <Input
-                  value={editing.ncm}
-                  onChange={(e) => setEditing({ ...editing, ncm: e.target.value })}
-                  placeholder="Ex: 22021000 (preenchido automaticamente via código de barras)"
-                  maxLength={8}
+                  value={editing.cfop}
+                  onChange={(e) => setEditing({ ...editing, cfop: e.target.value })}
+                  placeholder="5102"
+                  maxLength={4}
                   className="font-mono"
                 />
-                {editing.ncm_loading && (
-                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                )}
+                <p className="text-xs text-muted-foreground">Padrão: 5102 (venda interna)</p>
               </div>
             </div>
           </div>
