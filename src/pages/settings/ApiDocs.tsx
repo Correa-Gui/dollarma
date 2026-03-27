@@ -428,6 +428,66 @@ curl -X GET \\
   -d '{"session_id":"uuid","amount":50,"description":"Sangria para cofre"}'`,
   },
   {
+    method: "POST",
+    path: "/pdv-refunds",
+    title: "Registrar Devolução",
+    description: "Registra a devolução parcial ou total de uma venda. Reestoca automaticamente os produtos e cria movimentações de entrada no estoque. A venda é marcada como 'refunded'. Suporta devoluções parciais: informe a quantidade menor que a vendida em cada item.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      sale_id: "uuid-da-venda-original",
+      reason: "Produto com defeito",
+      items: [
+        { product_id: "uuid-produto-1", quantity: 10 },
+        { product_id: "uuid-produto-2", quantity: 1 },
+      ],
+    }, null, 2),
+    responses: [
+      {
+        status: 201,
+        label: "Registrado",
+        body: JSON.stringify({
+          success: true,
+          sale_id: "uuid-da-venda",
+          sale_number: 1042,
+          items_refunded: 2,
+          restocked: [
+            { product_id: "uuid-produto-1", quantity: 10 },
+            { product_id: "uuid-produto-2", quantity: 1 },
+          ],
+        }, null, 2),
+      },
+      {
+        status: 422,
+        label: "Quantidade inválida",
+        body: JSON.stringify({ error: "Refund quantity (25) exceeds sold quantity (20) for product uuid-produto-1" }, null, 2),
+      },
+      {
+        status: 422,
+        label: "Status inválido",
+        body: JSON.stringify({ error: "Sale is not eligible for refund (status: refunded)" }, null, 2),
+      },
+      {
+        status: 404,
+        label: "Venda não encontrada",
+        body: JSON.stringify({ error: "Sale uuid not found" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-refunds \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "sale_id": "uuid-da-venda",
+    "reason": "Produto com defeito",
+    "items": [
+      { "product_id": "uuid-produto", "quantity": 10 }
+    ]
+  }'`,
+  },
+  {
     method: "GET",
     path: "/pdv-store-settings",
     title: "Configurações da Loja",
