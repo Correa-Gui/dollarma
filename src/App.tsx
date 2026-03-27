@@ -13,8 +13,10 @@ import Categories from "./pages/stock/Categories";
 import Suppliers from "./pages/stock/Suppliers";
 import Movements from "./pages/stock/Movements";
 import Inventory from "./pages/stock/Inventory";
+import XmlImport from "./pages/stock/XmlImport";
 import SalesHistory from "./pages/sales/SalesHistory";
 import Refunds from "./pages/sales/Refunds";
+import Customers from "./pages/customers/Customers";
 import SalesByPeriod from "./pages/reports/SalesByPeriod";
 import TopSelling from "./pages/reports/TopSelling";
 import Profitability from "./pages/reports/Profitability";
@@ -31,6 +33,7 @@ import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
 import PlanoContas from "./pages/settings/PlanoContas";
 import ApiDocs from "./pages/settings/ApiDocs";
+import AuditLogPage from "./pages/audit/AuditLog";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -61,8 +64,10 @@ const App = () => (
                 <Route path="/estoque/fornecedores" element={<Suppliers />} />
                 <Route path="/estoque/movimentacoes" element={<Movements />} />
                 <Route path="/estoque/inventario" element={<Inventory />} />
+                <Route path="/estoque/importar-xml" element={<XmlImport />} />
                 <Route path="/vendas/historico" element={<SalesHistory />} />
                 <Route path="/vendas/devolucoes" element={<Refunds />} />
+                <Route path="/clientes" element={<Customers />} />
                 <Route path="/relatorios/vendas" element={<SalesByPeriod />} />
                 <Route path="/relatorios/mais-vendidos" element={<TopSelling />} />
                 <Route path="/relatorios/lucratividade" element={<Profitability />} />
@@ -79,6 +84,7 @@ const App = () => (
                 <Route path="/config/usuarios" element={<UsersSettings />} />
                 <Route path="/config/plano-contas" element={<PlanoContas />} />
                 <Route path="/config/api-docs" element={<ApiDocs />} />
+                <Route path="/auditoria" element={<AuditLogPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

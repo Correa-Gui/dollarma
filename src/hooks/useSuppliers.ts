@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { logAudit } from "./useAuditLog";
 
 export type Supplier = Tables<"suppliers">;
 
@@ -24,11 +25,12 @@ export function useCreateSupplier() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Fornecedor criado");
+      logAudit("supplier", data.id, data.name, "create");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }
 
@@ -40,11 +42,12 @@ export function useUpdateSupplier() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Fornecedor atualizado");
+      logAudit("supplier", data.id, data.name, "update");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }
 
@@ -52,13 +55,16 @@ export function useDeleteSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: s } = await supabase.from("suppliers").select("name").eq("id", id).single();
       const { error } = await supabase.from("suppliers").delete().eq("id", id);
       if (error) throw error;
+      return { id, name: s?.name ?? id };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, name }) => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Fornecedor removido");
+      logAudit("supplier", id, name, "delete");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }

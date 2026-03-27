@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSales, useCancelSale, type Sale } from "@/hooks/useSales";
+import { useCustomers, useLinkCustomerToSale } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Eye, XCircle, Download, Loader2 } from "lucide-react";
+import { Search, Eye, XCircle, Download, Loader2, UserRound, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 const statusLabel: Record<string, string> = { completed: "Concluída", cancelled: "Cancelada", refunded: "Devolvida" };
@@ -29,7 +30,9 @@ const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 
 const SalesHistory = () => {
   const { data: sales = [], isLoading } = useSales();
+  const { data: customers = [] } = useCustomers();
   const cancelSale = useCancelSale();
+  const linkCustomer = useLinkCustomerToSale();
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -38,9 +41,14 @@ const SalesHistory = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Sale | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [linkingCustomer, setLinkingCustomer] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
 
   const filtered = sales.filter((s) => {
-    const matchSearch = String(s.sale_number).includes(search) || (s.pdv_terminals?.name ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      String(s.sale_number).includes(search) ||
+      (s.pdv_terminals?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (s.customers?.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || s.status === filterStatus;
     const matchPayment = filterPayment === "all" || s.payment_method === filterPayment;
     return matchSearch && matchStatus && matchPayment;
@@ -48,13 +56,31 @@ const SalesHistory = () => {
 
   const confirmCancel = async () => {
     if (!cancelReason.trim() || !cancelTarget) return;
-    await cancelSale.mutateAsync({ id: cancelTarget.id, reason: cancelReason });
+    await cancelSale.mutateAsync({ id: cancelTarget.id, reason: cancelReason, saleNumber: cancelTarget.sale_number });
     setCancelDialogOpen(false);
   };
 
+  const openLinkCustomer = () => {
+    const currentCustomerId = (detailSale as unknown as Record<string, string>)["customer_id"] ?? "none";
+    setSelectedCustomerId(currentCustomerId);
+    setLinkingCustomer(true);
+  };
+
+  const saveLinkCustomer = async () => {
+    if (!detailSale) return;
+    await linkCustomer.mutateAsync({
+      saleId: detailSale.id,
+      customerId: selectedCustomerId === "none" ? null : selectedCustomerId,
+    });
+    setLinkingCustomer(false);
+    setDetailSale(null);
+  };
+
   const exportCSV = () => {
-    const header = "Nº,Data,Terminal,Pagamento,Total,Status\n";
-    const rows = filtered.map((s) => `${s.sale_number},${new Date(s.sold_at).toLocaleString("pt-BR")},${s.pdv_terminals?.name ?? s.origin},${s.payment_method},${s.total},${statusLabel[s.status] ?? s.status}`).join("\n");
+    const header = "Nº,Data,Terminal,Cliente,Pagamento,Total,Status\n";
+    const rows = filtered.map((s) =>
+      `${s.sale_number},${new Date(s.sold_at).toLocaleString("pt-BR")},${s.pdv_terminals?.name ?? s.origin},${s.customers?.name ?? ""},${s.payment_method},${s.total},${statusLabel[s.status] ?? s.status}`
+    ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "vendas.csv"; a.click();
     toast.success("CSV exportado");
@@ -64,7 +90,6 @@ const SalesHistory = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Histórico de Vendas</h1>
@@ -75,11 +100,10 @@ const SalesHistory = () => {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por número ou terminal..." className="pl-9 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Buscar por número, terminal ou cliente..." className="pl-9 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
@@ -102,7 +126,6 @@ const SalesHistory = () => {
         </Select>
       </div>
 
-      {/* Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
@@ -110,6 +133,7 @@ const SalesHistory = () => {
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Nº</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Data / Hora</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Terminal</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Cliente</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider text-center">Itens</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Pagamento</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Total</TableHead>
@@ -123,6 +147,7 @@ const SalesHistory = () => {
                 <TableCell className="font-mono text-xs font-medium">#{s.sale_number}</TableCell>
                 <TableCell className="text-xs tabular-nums">{new Date(s.sold_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{s.pdv_terminals?.name ?? s.origin}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{s.customers?.name ?? "—"}</TableCell>
                 <TableCell className="text-center text-sm tabular-nums">{s.sale_items?.length ?? 0}</TableCell>
                 <TableCell className="text-sm">{s.payment_method}</TableCell>
                 <TableCell className="text-right font-semibold text-sm tabular-nums">{fmt(Number(s.total))}</TableCell>
@@ -133,7 +158,7 @@ const SalesHistory = () => {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailSale(s)}><Eye className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setDetailSale(s); setLinkingCustomer(false); }}><Eye className="h-3.5 w-3.5" /></Button>
                     {s.status === "completed" && (
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => { setCancelTarget(s); setCancelReason(""); setCancelDialogOpen(true); }}><XCircle className="h-3.5 w-3.5" /></Button>
                     )}
@@ -143,37 +168,84 @@ const SalesHistory = () => {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada</TableCell>
+                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
 
-      <Sheet open={!!detailSale} onOpenChange={() => setDetailSale(null)}>
+      {/* Detail Sheet */}
+      <Sheet open={!!detailSale} onOpenChange={() => { setDetailSale(null); setLinkingCustomer(false); }}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Venda #{detailSale?.sale_number}</SheetTitle>
-            <SheetDescription>{detailSale && new Date(detailSale.sold_at).toLocaleString("pt-BR")} — {detailSale?.pdv_terminals?.name ?? detailSale?.origin}</SheetDescription>
+            <SheetDescription>
+              {detailSale && new Date(detailSale.sold_at).toLocaleString("pt-BR")} — {detailSale?.pdv_terminals?.name ?? detailSale?.origin}
+            </SheetDescription>
           </SheetHeader>
           {detailSale && (
             <div className="mt-6 space-y-4">
+              {/* Seção Cliente */}
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <UserRound className="h-4 w-4" /> Cliente
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={openLinkCustomer}>
+                    <Pencil className="h-3 w-3" />
+                    {detailSale.customers?.name ? "Alterar" : "Vincular"}
+                  </Button>
+                </div>
+                {linkingCustomer ? (
+                  <div className="flex gap-2">
+                    <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                      <SelectTrigger className="flex-1 h-8 text-sm"><SelectValue placeholder="Selecionar cliente" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {customers.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" className="h-8" onClick={saveLinkCustomer} disabled={linkCustomer.isPending}>
+                      {linkCustomer.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "OK"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8" onClick={() => setLinkingCustomer(false)}>✕</Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{detailSale.customers?.name ?? "Nenhum cliente vinculado"}</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-muted-foreground">Origem</p><p className="font-medium">{detailSale.origin}</p></div>
                 <div><p className="text-muted-foreground">Pagamento</p><p className="font-medium">{detailSale.payment_method}</p></div>
-                <div><p className="text-muted-foreground">Status</p><span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor[detailSale.status] ?? "bg-muted text-muted-foreground border-border"}`}>{statusLabel[detailSale.status] ?? detailSale.status}</span></div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor[detailSale.status] ?? "bg-muted text-muted-foreground border-border"}`}>
+                    {statusLabel[detailSale.status] ?? detailSale.status}
+                  </span>
+                </div>
               </div>
+
               {detailSale.cancel_reason && (
                 <div className="rounded-lg bg-destructive/10 p-3 text-sm">
                   <p className="font-medium text-destructive">Motivo do cancelamento:</p>
                   <p>{detailSale.cancel_reason}</p>
                 </div>
               )}
+
               <div>
                 <h4 className="text-sm font-medium mb-2">Itens</h4>
                 <div className="rounded-lg border">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead className="text-right">Qtd</TableHead><TableHead className="text-right">Unit.</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Produto</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">Unit.</TableHead>
+                        <TableHead className="text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {detailSale.sale_items?.map((it) => (
                         <TableRow key={it.id}>
@@ -193,6 +265,7 @@ const SalesHistory = () => {
         </SheetContent>
       </Sheet>
 
+      {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { NotFoundException } from "@zxing/library";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useProducts";
@@ -64,6 +64,20 @@ const Products = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Lista de categorias ordenada hierarquicamente para o seletor do form
+  const orderedCategories = useMemo(() => {
+    const roots = categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    return roots.flatMap((root) => [
+      root,
+      ...categories.filter((c) => c.parent_id === root.id).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    ]);
+  }, [categories]);
+
+  // Filtro de categoria inclui subcategorias
+  const getSubtree = useCallback((catId: string) => {
+    return [catId, ...categories.filter((c) => c.parent_id === catId).map((c) => c.id)];
+  }, [categories]);
 
   const generateSku = () => {
     const nums = products
@@ -158,7 +172,8 @@ const Products = () => {
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.sku.toLowerCase().includes(search.toLowerCase()) ||
       (p.barcode ?? "").includes(search);
-    const matchCategory = filterCategory === "all" || p.category_id === filterCategory;
+    const matchCategory =
+      filterCategory === "all" || getSubtree(filterCategory).includes(p.category_id ?? "");
     return matchSearch && matchCategory;
   });
 
@@ -251,10 +266,14 @@ const Products = () => {
           <Input placeholder="Buscar por nome, SKU ou código de barras..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+            {orderedCategories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.parent_id ? `└ ${c.name}` : c.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -371,7 +390,11 @@ const Products = () => {
                     <SelectTrigger className="flex-1"><SelectValue placeholder="Nenhuma" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Nenhuma</SelectItem>
-                      {categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                      {orderedCategories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.parent_id ? `└ ${c.name}` : c.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button type="button" variant="outline" size="icon" onClick={() => { setQuickName(""); setQuickCreate("category"); }} title="Nova categoria">

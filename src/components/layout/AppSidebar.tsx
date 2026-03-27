@@ -30,6 +30,9 @@ import {
   BarChart2,
   CreditCard,
   RefreshCw,
+  UserRound,
+  FileUp,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
@@ -69,6 +72,7 @@ const menuItems = [
     icon: ShoppingCart,
     children: [
       { title: "Histórico de Vendas", url: "/vendas/historico", icon: History },
+      { title: "Clientes", url: "/clientes", icon: UserRound },
       { title: "Devoluções", url: "/vendas/devolucoes", icon: RotateCcw },
     ],
   },
@@ -81,6 +85,7 @@ const menuItems = [
       { title: "Fornecedores", url: "/estoque/fornecedores", icon: Truck },
       { title: "Movimentações", url: "/estoque/movimentacoes", icon: ArrowLeftRight },
       { title: "Inventário", url: "/estoque/inventario", icon: ClipboardList },
+      { title: "Importar XML", url: "/estoque/importar-xml", icon: FileUp },
     ],
   },
   {
@@ -108,6 +113,7 @@ const menuItems = [
       { title: "PDV / Integração", url: "/config/pdv", icon: MonitorSmartphone },
       { title: "Usuários", url: "/config/usuarios", icon: Users },
       { title: "Plano de Contas", url: "/config/plano-contas", icon: FileText },
+      { title: "Auditoria", url: "/auditoria", icon: ShieldCheck },
       { title: "API Docs", url: "/config/api-docs", icon: BookOpen },
     ],
   },
@@ -257,3 +263,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

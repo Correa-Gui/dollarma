@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/useCategories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,21 @@ const Categories = () => {
   const [editing, setEditing] = useState<CategoryForm>({ name: "", parent_id: null });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const parentCategories = categories.filter((c) => !c.parent_id);
+  // Ordenação hierárquica: raiz → filhos imediatamente abaixo
+  const sortedCategories = useMemo(() => {
+    const roots = categories
+      .filter((c) => !c.parent_id)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    return roots.flatMap((root) => [
+      root,
+      ...categories
+        .filter((c) => c.parent_id === root.id)
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    ]);
+  }, [categories]);
+
+  // Apenas categorias raiz disponíveis como pai (evita mais de 2 níveis)
+  const rootCategories = categories.filter((c) => !c.parent_id);
 
   const openNew = () => { setEditing({ name: "", parent_id: null }); setEditingId(null); setDialogOpen(true); };
   const openEdit = (c: typeof categories[0]) => {
@@ -43,7 +57,11 @@ const Categories = () => {
     setDialogOpen(false);
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -66,10 +84,17 @@ const Categories = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.map((c) => (
+            {sortedCategories.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-muted-foreground">{c.parent?.name ?? "—"}</TableCell>
+                <TableCell className={c.parent_id ? "text-muted-foreground" : "font-medium"}>
+                  {c.parent_id ? (
+                    <span className="flex items-center gap-1 pl-4">
+                      <span className="text-muted-foreground select-none">└</span>
+                      {c.name}
+                    </span>
+                  ) : c.name}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">{c.parent?.name ?? "—"}</TableCell>
                 <TableCell className="text-right">{c.product_count ?? 0}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -89,21 +114,31 @@ const Categories = () => {
           <div className="grid gap-4 py-2">
             <div className="space-y-2"><Label>Nome *</Label><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
             <div className="space-y-2">
-              <Label>Categoria Pai</Label>
-              <Select value={editing.parent_id ?? "none"} onValueChange={(v) => setEditing({ ...editing, parent_id: v === "none" ? null : v })}>
-                <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
+              <Label>Categoria Pai (subcategoria)</Label>
+              <Select
+                value={editing.parent_id ?? "none"}
+                onValueChange={(v) => setEditing({ ...editing, parent_id: v === "none" ? null : v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Nenhuma (raiz)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhuma (raiz)</SelectItem>
-                  {parentCategories.filter((c) => c.id !== editingId).map((c) => (
+                  <SelectItem value="none">Nenhuma (categoria raiz)</SelectItem>
+                  {rootCategories.filter((c) => c.id !== editingId).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">Deixe em branco para criar uma categoria principal.</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={createCat.isPending || updateCat.isPending}>{editingId ? "Salvar" : "Criar"}</Button>
+            <Button
+              onClick={save}
+              disabled={!editing.name || createCat.isPending || updateCat.isPending}
+            >
+              {(createCat.isPending || updateCat.isPending) && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {editingId ? "Salvar" : "Criar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

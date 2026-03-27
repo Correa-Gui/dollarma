@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { logAudit } from "./useAuditLog";
 
 export type Product = Tables<"products"> & {
   categories?: { name: string } | null;
@@ -30,11 +31,12 @@ export function useCreateProduct() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success("Produto criado");
+      logAudit("product", data.id, data.name, "create", { sku: data.sku, sale_price: data.sale_price });
     },
-    onError: (e) => toast.error(`Erro ao criar produto: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro ao criar produto: ${e.message}`),
   });
 }
 
@@ -46,11 +48,12 @@ export function useUpdateProduct() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success("Produto atualizado");
+      logAudit("product", data.id, data.name, "update", { sale_price: data.sale_price, stock_quantity: data.stock_quantity });
     },
-    onError: (e) => toast.error(`Erro ao atualizar: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro ao atualizar: ${e.message}`),
   });
 }
 
@@ -58,13 +61,16 @@ export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: p } = await supabase.from("products").select("name").eq("id", id).single();
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
+      return { id, name: p?.name ?? id };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, name }) => {
       qc.invalidateQueries({ queryKey: ["products"] });
       toast.success("Produto removido");
+      logAudit("product", id, name, "delete");
     },
-    onError: (e) => toast.error(`Erro ao remover: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro ao remover: ${e.message}`),
   });
 }

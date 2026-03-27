@@ -2,20 +2,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { logAudit } from "./useAuditLog";
 
 export type SaleItem = Tables<"sale_items">;
 export type Sale = Tables<"sales"> & {
   sale_items?: SaleItem[];
   pdv_terminals?: { name: string } | null;
+  customers?: { name: string } | null;
 };
 
 export function useSales() {
   return useQuery({
     queryKey: ["sales"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("sales")
-        .select("*, sale_items(*), pdv_terminals(name)")
+        .select("*, sale_items(*), pdv_terminals(name), customers(name)")
         .order("sold_at", { ascending: false });
       if (error) throw error;
       return data as Sale[];
@@ -26,17 +29,19 @@ export function useSales() {
 export function useCancelSale() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+    mutationFn: async ({ id, reason, saleNumber }: { id: string; reason: string; saleNumber?: number }) => {
       const { error } = await supabase
         .from("sales")
         .update({ status: "cancelled", cancel_reason: reason })
         .eq("id", id);
       if (error) throw error;
+      return { id, reason, saleNumber };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, reason, saleNumber }) => {
       qc.invalidateQueries({ queryKey: ["sales"] });
       toast.success("Venda cancelada");
+      logAudit("sale", id, `Venda #${saleNumber ?? id}`, "cancel", { reason });
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }

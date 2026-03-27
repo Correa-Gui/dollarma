@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { logAudit } from "./useAuditLog";
 
 export type Category = Tables<"categories"> & {
   parent?: { name: string } | null;
@@ -18,7 +19,6 @@ export function useCategories() {
         .order("name");
       if (error) throw error;
 
-      // Get product counts per category
       const { data: products } = await supabase
         .from("products")
         .select("category_id");
@@ -28,7 +28,6 @@ export function useCategories() {
         if (p.category_id) countMap[p.category_id] = (countMap[p.category_id] || 0) + 1;
       });
 
-      // Map parent names
       const catMap = new Map(cats.map((c) => [c.id, c]));
       return cats.map((c) => ({
         ...c,
@@ -47,11 +46,12 @@ export function useCreateCategory() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["categories"] });
       toast.success("Categoria criada");
+      logAudit("category", data.id, data.name, "create");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }
 
@@ -63,11 +63,12 @@ export function useUpdateCategory() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["categories"] });
       toast.success("Categoria atualizada");
+      logAudit("category", data.id, data.name, "update");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }
 
@@ -75,13 +76,16 @@ export function useDeleteCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: c } = await supabase.from("categories").select("name").eq("id", id).single();
       const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
+      return { id, name: c?.name ?? id };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, name }) => {
       qc.invalidateQueries({ queryKey: ["categories"] });
       toast.success("Categoria removida");
+      logAudit("category", id, name, "delete");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 }
