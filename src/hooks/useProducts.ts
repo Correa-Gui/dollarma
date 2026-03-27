@@ -62,6 +62,7 @@ export function useDeleteProduct() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data: p } = await supabase.from("products").select("name").eq("id", id).single();
+      await supabase.from("stock_movements").delete().eq("product_id", id);
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
       return { id, name: p?.name ?? id };

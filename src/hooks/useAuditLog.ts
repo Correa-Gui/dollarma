@@ -45,7 +45,7 @@ export async function logAudit(
       changes: changes ?? null,
     });
   } catch (e) {
-    console.warn("Audit log failed:", e);
+    console.error("Audit log failed:", e);
   }
 }
 
