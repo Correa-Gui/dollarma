@@ -116,6 +116,9 @@ const Products = () => {
     setScannerOpen(false);
   }, []);
 
+  const toTitleCase = (str: string) =>
+    str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
   // Busca nome + NCM no COSMOS e preenche o formulário
   const enrichFromBarcode = async (ean: string) => {
     if (!ean || ean.length < 8) return;
@@ -124,7 +127,7 @@ const Products = () => {
     setEditing((prev) => ({
       ...prev,
       ncm_loading: false,
-      name: !prev.name && result?.description ? result.description : prev.name,
+      name: !prev.name && result?.description ? toTitleCase(result.description) : prev.name,
       ncm: !prev.ncm && result?.ncm?.code ? result.ncm.code : prev.ncm,
     }));
     if (result?.ncm?.code) {
@@ -196,6 +199,7 @@ const Products = () => {
   };
 
   const handleBarcodeBlur = (ean: string) => {
+    if (editing.ncm_loading) return; // requisição em andamento, ignora blur
     if (editing.ncm && editing.name) return; // já preenchido, não sobrescreve
     enrichFromBarcode(ean);
   };
