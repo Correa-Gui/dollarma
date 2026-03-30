@@ -669,8 +669,8 @@ const Products = () => {
               <div className="space-y-2"><Label>Margem (%)</Label><Input disabled value={`${margin}%`} className="bg-muted" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Estoque Atual</Label><Input type="number" value={editing.stock_quantity} onChange={(e) => setEditing({ ...editing, stock_quantity: +e.target.value })} /></div>
-              <div className="space-y-2"><Label>Estoque Mínimo</Label><Input type="number" value={editing.min_stock} onChange={(e) => setEditing({ ...editing, min_stock: +e.target.value })} /></div>
+              <div className="space-y-2"><Label>Estoque Atual</Label><Input type="number" value={editing.stock_quantity || ""} onChange={(e) => setEditing({ ...editing, stock_quantity: +e.target.value })} /></div>
+              <div className="space-y-2"><Label>Estoque Mínimo</Label><Input type="number" value={editing.min_stock || ""} onChange={(e) => setEditing({ ...editing, min_stock: +e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
