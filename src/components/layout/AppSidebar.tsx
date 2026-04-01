@@ -134,9 +134,10 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const { signOut } = useAuth();
   const collapsed = state === "collapsed";
+  const closeOnMobile = () => { if (isMobile) setOpenMobile(false); };
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -207,6 +208,7 @@ export function AppSidebar() {
                                 <NavLink
                                   to={child.url}
                                   end
+                                  onClick={closeOnMobile}
                                   className="
                                     rounded-md pl-3 transition-all duration-200 ease-out text-[12.5px]
                                     text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 hover:translate-x-0.5
@@ -232,6 +234,7 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url!}
                         end
+                        onClick={closeOnMobile}
                         className="
                           rounded-md transition-all duration-200 ease-out text-[13px]
                           text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 hover:translate-x-0.5
