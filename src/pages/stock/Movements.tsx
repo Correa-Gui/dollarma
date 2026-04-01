@@ -47,6 +47,7 @@ const Movements = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const scannedRef = useRef(false);
+  const productsRef = useRef(products);
   productsRef.current = products;
 
   const stopScanner = useCallback(() => {
