@@ -87,6 +87,13 @@ const Products = () => {
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const cosmosCalledForRef = useRef<string | null>(null);
 
+  // Scanner da lista (busca produto existente ou abre novo)
+  const [listScannerOpen, setListScannerOpen] = useState(false);
+  const listVideoRef = useRef<HTMLVideoElement>(null);
+  const listReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const listScannedRef = useRef(false);
+  const productsRef = useRef(products);
+
   // Lista de categorias ordenada hierarquicamente para o seletor do form
   const orderedCategories = useMemo(() => {
     const roots = categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -109,6 +116,8 @@ const Products = () => {
     return String(max + 1).padStart(6, "0");
   };
 
+  productsRef.current = products;
+
   const stopScanner = useCallback(() => {
     if (readerRef.current) {
       BrowserMultiFormatReader.releaseAllStreams();
@@ -116,6 +125,55 @@ const Products = () => {
     }
     setScannerOpen(false);
   }, []);
+
+  const stopListScanner = useCallback(() => {
+    if (listReaderRef.current) {
+      BrowserMultiFormatReader.releaseAllStreams();
+      listReaderRef.current = null;
+    }
+    setListScannerOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!listScannerOpen || !listVideoRef.current) return;
+
+    listScannedRef.current = false;
+    const reader = new BrowserMultiFormatReader();
+    listReaderRef.current = reader;
+
+    reader.decodeFromConstraints(
+      { video: { facingMode: "environment" } },
+      listVideoRef.current,
+      (result, error) => {
+        if (result && !listScannedRef.current) {
+          listScannedRef.current = true;
+          const ean = result.getText();
+          const found = productsRef.current.find((p) => p.barcode === ean);
+          stopListScanner();
+          if (found) {
+            openEdit(found);
+          } else {
+            toast.warning(`Código ${ean} não cadastrado. Abrindo formulário de novo produto.`);
+            cosmosCalledForRef.current = null;
+            setEditing({ ...emptyForm, sku: generateSku(), barcode: ean });
+            setEditingId(null);
+            setDialogOpen(true);
+            enrichFromBarcode(ean);
+          }
+        } else if (error && !(error instanceof NotFoundException)) {
+          // NotFoundException esperado entre frames sem código visível
+        }
+      }
+    ).catch(() => {
+      toast.error("Não foi possível acessar a câmera.");
+      stopListScanner();
+    });
+
+    return () => {
+      BrowserMultiFormatReader.releaseAllStreams();
+      listReaderRef.current = null;
+    };
+  }, [listScannerOpen, stopListScanner]);
 
   const toTitleCase = (str: string) =>
     str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -355,6 +413,9 @@ const Products = () => {
               : <><Sparkles className="h-4 w-4 mr-1" />Enriquecer NCM</>
             }
           </Button>
+          <Button variant="outline" onClick={() => setListScannerOpen(true)} title="Escanear produto">
+            <ScanLine className="h-4 w-4" />
+          </Button>
           <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo Produto</Button>
         </div>
       </div>
@@ -558,7 +619,23 @@ const Products = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Scanner de câmera */}
+      {/* Scanner da lista de produtos */}
+      {listScannerOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center gap-4">
+          <p className="text-white text-sm font-medium">Aponte a câmera para o código de barras</p>
+          <div className="relative w-full max-w-sm">
+            <video ref={listVideoRef} className="w-full rounded-lg" muted playsInline />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-primary w-4/5 h-20 rounded-md" />
+            </div>
+          </div>
+          <Button variant="outline" onClick={stopListScanner}>
+            <X className="h-4 w-4 mr-1" /> Cancelar
+          </Button>
+        </div>
+      )}
+
+      {/* Scanner de câmera (dentro do form de produto) */}
       {scannerOpen && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center gap-4">
           <p className="text-white text-sm font-medium">Aponte a câmera para o código de barras</p>
