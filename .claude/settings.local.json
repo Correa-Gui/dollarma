@@ -9,7 +9,11 @@
       "Skill(update-config:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(grep -n \"policy\\\\|RLS\\\\|enable row\" c:/Users/Guilherme/dollarma/supabase/migrations/*.sql)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

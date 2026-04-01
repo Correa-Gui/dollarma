@@ -137,6 +137,28 @@
   }
 }
 
+/* ── iOS / Mobile Safari fixes ── */
+@layer utilities {
+  /* Dynamic viewport height — 100dvh corrige o bug do 100vh no Safari Mobile
+     onde a barra de endereço reduz o espaço disponível sem notificar o layout */
+  .min-h-dvh { min-height: 100dvh; }
+
+  /* Safe-area insets para iPhone com notch / Dynamic Island / home indicator */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top:    env(safe-area-inset-top);    }
+}
+
+/* Evita bounce scroll horizontal em iOS que causa layout shift */
+html { overflow-x: hidden; }
+body { overflow-x: hidden; }
+
+/* Garante que inputs/selects no iOS não aumentem o zoom ao focar */
+@media screen and (max-width: 767px) {
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
 @media print {
   body {
     font-size: 10pt;

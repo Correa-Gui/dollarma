@@ -407,16 +407,16 @@ const Products = () => {
           <p className="text-muted-foreground text-sm">{products.length} produtos cadastrados</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleBulkNcm} disabled={bulkLoading || isLoading}>
+          <Button variant="outline" onClick={handleBulkNcm} disabled={bulkLoading || isLoading} className="hidden sm:flex">
             {bulkLoading
               ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />{bulkProgress.done}/{bulkProgress.total}</>
               : <><Sparkles className="h-4 w-4 mr-1" />Enriquecer NCM</>
             }
           </Button>
-          <Button variant="outline" onClick={() => setListScannerOpen(true)} title="Escanear produto">
+          <Button variant="outline" size="icon" onClick={() => setListScannerOpen(true)} title="Escanear produto">
             <ScanLine className="h-4 w-4" />
           </Button>
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo Produto</Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Novo </span>Produto</Button>
         </div>
       </div>
 
@@ -426,7 +426,7 @@ const Products = () => {
           <Input placeholder="Buscar por nome, SKU ou código de barras..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[200px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
             {orderedCategories.map((c) => (
@@ -438,7 +438,7 @@ const Products = () => {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -454,16 +454,16 @@ const Products = () => {
                   }}
                 />
               </TableHead>
-              <TableHead>SKU</TableHead>
+              <TableHead className="hidden sm:table-cell">SKU</TableHead>
               <TableHead>Nome</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>NCM</TableHead>
-              <TableHead className="text-right">Custo</TableHead>
+              <TableHead className="hidden md:table-cell">Categoria</TableHead>
+              <TableHead className="hidden lg:table-cell">NCM</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Custo</TableHead>
               <TableHead className="text-right">Venda</TableHead>
-              <TableHead className="text-right">Margem</TableHead>
+              <TableHead className="hidden sm:table-cell text-right">Margem</TableHead>
               <TableHead className="text-right">Estoque</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[80px]">Ações</TableHead>
+              <TableHead className="hidden sm:table-cell">Status</TableHead>
+              <TableHead className="w-[72px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -485,18 +485,18 @@ const Products = () => {
                       }}
                     />
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{p.categories?.name ?? "—"}</TableCell>
+                  <TableCell className="hidden sm:table-cell font-mono text-xs">{p.sku}</TableCell>
+                  <TableCell className="font-medium max-w-[140px] truncate">{p.name}</TableCell>
+                  <TableCell className="hidden md:table-cell">{p.categories?.name ?? "—"}</TableCell>
                   {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <TableCell className="font-mono text-xs">{(p as any).ncm ?? "—"}</TableCell>
-                  <TableCell className="text-right">{cost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                  <TableCell className="hidden lg:table-cell font-mono text-xs">{(p as any).ncm ?? "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{cost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                   <TableCell className="text-right">{sale.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
-                  <TableCell className="text-right">{m}%</TableCell>
+                  <TableCell className="hidden sm:table-cell text-right">{m}%</TableCell>
                   <TableCell className="text-right">
                     <span className={p.stock_quantity <= p.min_stock ? "text-destructive font-semibold" : ""}>{p.stock_quantity}</span>
                   </TableCell>
-                  <TableCell><StatusBadge tone={p.is_active ? "success" : "neutral"}>{p.is_active ? "Ativo" : "Inativo"}</StatusBadge></TableCell>
+                  <TableCell className="hidden sm:table-cell"><StatusBadge tone={p.is_active ? "success" : "neutral"}>{p.is_active ? "Ativo" : "Inativo"}</StatusBadge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -515,16 +515,16 @@ const Products = () => {
 
       {/* Barra de ação flutuante para bulk edit */}
       {selectedIds.size > 0 && !bulkEditLoading && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
+        <div className="fixed bottom-[env(safe-area-inset-bottom,1rem)] left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-auto z-50 flex flex-wrap items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
           <Badge variant="secondary">{selectedIds.size} produto(s)</Badge>
-          <Button size="sm" variant="outline" onClick={() => { setBulkAction("price"); setBulkActionOpen(true); }}>Alterar Preço</Button>
-          <Button size="sm" variant="outline" onClick={() => { setBulkAction("status"); setBulkActionOpen(true); }}>Alterar Status</Button>
-          <Button size="sm" variant="outline" onClick={() => { setBulkAction("category"); setBulkCategoryId(null); setBulkActionOpen(true); }}>Alterar Categoria</Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("price"); setBulkActionOpen(true); }}>Preço</Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("status"); setBulkActionOpen(true); }}>Status</Button>
+          <Button size="sm" variant="outline" onClick={() => { setBulkAction("category"); setBulkCategoryId(null); setBulkActionOpen(true); }}>Categoria</Button>
           <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}><X className="h-4 w-4" /></Button>
         </div>
       )}
       {bulkEditLoading && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
+        <div className="fixed bottom-[env(safe-area-inset-bottom,1rem)] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-sm">Atualizando {bulkEditProgress.done}/{bulkEditProgress.total}...</span>
         </div>

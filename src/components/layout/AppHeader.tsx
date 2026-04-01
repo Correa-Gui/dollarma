@@ -52,7 +52,10 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 backdrop-blur px-4">
+      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+        {/* Notch / Dynamic Island spacer no iPhone com viewport-fit=cover */}
+        <div className="h-[env(safe-area-inset-top)] pt-safe" />
+      <div className="flex h-14 items-center gap-3 px-4">
         <SidebarTrigger />
         <span className="text-sm text-muted-foreground font-medium">{breadcrumb}</span>
 
@@ -80,6 +83,7 @@ export function AppHeader() {
             <span className="sr-only">Alternar tema</span>
           </Button>
         </div>
+      </div>
       </header>
 
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>

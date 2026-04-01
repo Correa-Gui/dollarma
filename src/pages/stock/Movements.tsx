@@ -123,7 +123,7 @@ const Movements = () => {
 
       <div className="flex gap-3">
         <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[200px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os tipos</SelectItem>
             {Object.entries(typeLabels).map(([key, label]) => (
@@ -133,31 +133,31 @@ const Movements = () => {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
+              <TableHead className="hidden sm:table-cell">Data</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Produto</TableHead>
               <TableHead className="text-right">Qtd</TableHead>
-              <TableHead className="text-right">Antes</TableHead>
-              <TableHead className="text-right">Depois</TableHead>
-              <TableHead>Origem</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Antes</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Depois</TableHead>
+              <TableHead className="hidden sm:table-cell">Origem</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((m) => (
               <TableRow key={m.id}>
-                <TableCell className="text-xs">{new Date(m.created_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="hidden sm:table-cell text-xs whitespace-nowrap">{new Date(m.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>
                   <StatusBadge tone={typeBadgeTone[m.type] ?? "neutral"}>{typeLabels[m.type] ?? m.type}</StatusBadge>
                 </TableCell>
-                <TableCell className="font-medium">{m.products?.name ?? "—"}</TableCell>
+                <TableCell className="font-medium max-w-[140px] truncate">{m.products?.name ?? "—"}</TableCell>
                 <TableCell className="text-right">{m.quantity}</TableCell>
-                <TableCell className="text-right">{m.previous_qty}</TableCell>
-                <TableCell className="text-right">{m.new_qty}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{m.origin ?? "—"}</TableCell>
+                <TableCell className="hidden md:table-cell text-right">{m.previous_qty}</TableCell>
+                <TableCell className="hidden md:table-cell text-right">{m.new_qty}</TableCell>
+                <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">{m.origin ?? "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
