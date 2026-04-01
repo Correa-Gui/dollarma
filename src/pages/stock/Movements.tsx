@@ -46,6 +46,7 @@ const Movements = () => {
   const [scannerOpen, setScannerOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const scannedRef = useRef(false);
 
   const stopScanner = useCallback(() => {
     if (readerRef.current) {
@@ -58,6 +59,7 @@ const Movements = () => {
   useEffect(() => {
     if (!scannerOpen || !videoRef.current) return;
 
+    scannedRef.current = false;
     const reader = new BrowserMultiFormatReader();
     readerRef.current = reader;
 
@@ -65,7 +67,8 @@ const Movements = () => {
       { video: { facingMode: "environment" } },
       videoRef.current,
       (result, error) => {
-        if (result) {
+        if (result && !scannedRef.current) {
+          scannedRef.current = true;
           const ean = result.getText();
           const found = products.find((p) => p.barcode === ean);
           if (found) {
