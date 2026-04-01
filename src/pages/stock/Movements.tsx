@@ -47,6 +47,7 @@ const Movements = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const scannedRef = useRef(false);
+  productsRef.current = products;
 
   const stopScanner = useCallback(() => {
     if (readerRef.current) {
@@ -70,7 +71,7 @@ const Movements = () => {
         if (result && !scannedRef.current) {
           scannedRef.current = true;
           const ean = result.getText();
-          const found = products.find((p) => p.barcode === ean);
+          const found = productsRef.current.find((p) => p.barcode === ean);
           if (found) {
             setNewMov((prev) => ({ ...prev, product_id: found.id }));
             toast.success(`Produto encontrado: ${found.name}`);
@@ -91,7 +92,7 @@ const Movements = () => {
       BrowserMultiFormatReader.releaseAllStreams();
       readerRef.current = null;
     };
-  }, [scannerOpen, stopScanner, products]);
+  }, [scannerOpen, stopScanner]);
 
   const filtered = filterType === "all" ? movements : movements.filter((m) => m.type === filterType);
 
