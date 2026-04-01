@@ -85,6 +85,7 @@ const Products = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const cosmosCalledForRef = useRef<string | null>(null);
 
   // Lista de categorias ordenada hierarquicamente para o seletor do form
   const orderedCategories = useMemo(() => {
@@ -122,6 +123,8 @@ const Products = () => {
   // Busca nome + NCM no COSMOS e preenche o formulário
   const enrichFromBarcode = async (ean: string) => {
     if (!ean || ean.length < 8) return;
+    if (cosmosCalledForRef.current === ean) return;
+    cosmosCalledForRef.current = ean;
     setEditing((prev) => ({ ...prev, ncm_loading: true }));
     const result = await fetchCosmosProduct(ean);
     setEditing((prev) => ({
@@ -178,12 +181,14 @@ const Products = () => {
   });
 
   const openNew = () => {
+    cosmosCalledForRef.current = null;
     setEditing({ ...emptyForm, sku: generateSku() });
     setEditingId(null);
     setDialogOpen(true);
   };
 
   const openEdit = (p: Product) => {
+    cosmosCalledForRef.current = null;
     setEditing({
       name: p.name, sku: p.sku, barcode: p.barcode ?? "",
       cost_price: toInput(Number(p.cost_price)),
@@ -199,7 +204,6 @@ const Products = () => {
   };
 
   const handleBarcodeBlur = (ean: string) => {
-    if (editing.ncm_loading) return; // requisição em andamento, ignora blur
     if (editing.ncm && editing.name) return; // já preenchido, não sobrescreve
     enrichFromBarcode(ean);
   };
@@ -588,7 +592,7 @@ const Products = () => {
                 <div className="flex gap-2">
                   <Input
                     value={editing.barcode}
-                    onChange={(e) => setEditing({ ...editing, barcode: e.target.value })}
+                    onChange={(e) => { cosmosCalledForRef.current = null; setEditing({ ...editing, barcode: e.target.value }); }}
                     onBlur={(e) => handleBarcodeBlur(e.target.value)}
                     placeholder="Digite ou escaneie"
                     className="flex-1"
