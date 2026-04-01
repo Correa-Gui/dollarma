@@ -7,7 +7,6 @@ import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/stock/Products";
 import Categories from "./pages/stock/Categories";
@@ -57,7 +56,6 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/" element={<Index />} />
               <Route
                 element={
                   <ProtectedRoute>
@@ -65,7 +63,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/" element={<Dashboard />} />
                 <Route path="/estoque/produtos" element={<Products />} />
                 <Route path="/estoque/categorias" element={<Categories />} />
                 <Route path="/estoque/fornecedores" element={<Suppliers />} />

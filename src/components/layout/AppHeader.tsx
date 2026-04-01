@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 
 const breadcrumbMap: Record<string, string> = {
-  "/dashboard": "Dashboard",
+  "/": "Dashboard",
   "/vendas/historico": "Vendas › Histórico",
   "/vendas/devolucoes": "Vendas › Devoluções",
   "/estoque/produtos": "Estoque › Produtos",

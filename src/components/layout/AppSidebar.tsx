@@ -67,7 +67,7 @@ import { Separator } from "@/components/ui/separator";
 const menuItems = [
   {
     title: "Dashboard",
-    url: "/dashboard",
+    url: "/",
     icon: LayoutDashboard,
   },
   {
@@ -155,10 +155,10 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex flex-col">
               <span className="text-sm font-bold text-sidebar-foreground tracking-tight leading-none">
-                Dollar Gestão
+                GestãoLoja
               </span>
               <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
-                Painel operacional
+                Painel de Controle
               </span>
             </div>
           )}
