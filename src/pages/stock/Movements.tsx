@@ -165,7 +165,7 @@ const Movements = () => {
 
       {/* Scanner de câmera */}
       {scannerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center gap-4">
+        <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center gap-4">
           <video ref={videoRef} className="w-full max-w-sm rounded-lg" />
           <Button variant="outline" onClick={stopScanner}>
             <X className="h-4 w-4 mr-1" /> Cancelar
@@ -174,7 +174,7 @@ const Movements = () => {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent onFocusOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Ajuste Manual de Estoque</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
