@@ -1,30 +1,24 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Store } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
-import { Store, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-
-  // Login state
+  const [showForgot, setShowForgot] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-
-  // Signup state
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
-
-  // Forgot password state
   const [forgotEmail, setForgotEmail] = useState("");
-  const [showForgot, setShowForgot] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,12 +28,14 @@ const Auth = () => {
       password: loginPassword,
     });
     setLoading(false);
+
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Login realizado com sucesso");
-      navigate("/");
+      return;
     }
+
+    toast.success("Login realizado com sucesso");
+    navigate("/dashboard");
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -54,11 +50,13 @@ const Auth = () => {
       },
     });
     setLoading(false);
+
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Conta criada! Verifique seu e-mail para confirmar.");
+      return;
     }
+
+    toast.success("Conta criada! Verifique seu e-mail para confirmar.");
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -68,34 +66,42 @@ const Auth = () => {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setLoading(false);
+
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("E-mail de recuperação enviado!");
-      setShowForgot(false);
+      return;
     }
+
+    toast.success("E-mail de recuperação enviado!");
+    setShowForgot(false);
   };
 
   if (showForgot) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background p-4">
+      <main className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <Store className="h-10 w-10 mx-auto text-primary mb-2" />
-            <CardTitle>Recuperar Senha</CardTitle>
-            <CardDescription>Informe seu e-mail para receber o link de recuperação</CardDescription>
+            <Store className="mx-auto mb-2 h-10 w-10 text-primary" />
+            <CardTitle>Recuperar senha</CardTitle>
+            <CardDescription>Informe seu e-mail para receber o link de recuperação.</CardDescription>
           </CardHeader>
           <form onSubmit={handleForgotPassword}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="forgot-email">E-mail</Label>
-                <Input id="forgot-email" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} required />
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                />
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-2">
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                Enviar Link
+                {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Enviar link
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowForgot(false)}>
                 Voltar ao login
@@ -108,15 +114,15 @@ const Auth = () => {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-4">
+    <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Store className="h-10 w-10 mx-auto text-primary mb-2" />
-          <CardTitle className="text-2xl">GestãoLoja</CardTitle>
-          <CardDescription>Sistema de Gestão de Loja</CardDescription>
+          <Store className="mx-auto mb-2 h-10 w-10 text-primary" />
+          <CardTitle className="text-2xl">Dollar Gestão</CardTitle>
+          <CardDescription>Plataforma para vendas, estoque e financeiro</CardDescription>
         </CardHeader>
         <Tabs defaultValue="login">
-          <TabsList className="grid w-full grid-cols-2 mx-auto max-w-[90%]">
+          <TabsList className="mx-auto grid w-full max-w-[90%] grid-cols-2">
             <TabsTrigger value="login">Entrar</TabsTrigger>
             <TabsTrigger value="signup">Cadastrar</TabsTrigger>
           </TabsList>
@@ -126,16 +132,28 @@ const Auth = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">E-mail</Label>
-                  <Input id="login-email" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
-                  <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                  />
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
                   Entrar
                 </Button>
                 <Button type="button" variant="link" className="text-xs" onClick={() => setShowForgot(true)}>
@@ -154,17 +172,30 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">E-mail</Label>
-                  <Input id="signup-email" type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
-                  <Input id="signup-password" type="password" minLength={6} value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    minLength={6}
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    required
+                  />
                 </div>
               </CardContent>
               <CardFooter>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                  Criar Conta
+                  {loading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Criar conta
                 </Button>
               </CardFooter>
             </form>
