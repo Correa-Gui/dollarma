@@ -93,6 +93,8 @@ const Products = () => {
   const listReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const listScannedRef = useRef(false);
   const productsRef = useRef(products);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const enrichFromBarcodeRef = useRef<(ean: string) => void>(() => {});
 
   // Lista de categorias ordenada hierarquicamente para o seletor do form
   const orderedCategories = useMemo(() => {
@@ -158,7 +160,7 @@ const Products = () => {
             setEditing({ ...emptyForm, sku: generateSku(), barcode: ean });
             setEditingId(null);
             setDialogOpen(true);
-            enrichFromBarcode(ean);
+            enrichFromBarcodeRef.current(ean);
           }
         } else if (error && !(error instanceof NotFoundException)) {
           // NotFoundException esperado entre frames sem código visível
@@ -197,6 +199,7 @@ const Products = () => {
       toast.info(`COSMOS: produto encontrado, sem NCM cadastrado.`);
     }
   };
+  enrichFromBarcodeRef.current = enrichFromBarcode;
 
   useEffect(() => {
     if (!scannerOpen || !videoRef.current) return;
