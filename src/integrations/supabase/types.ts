@@ -338,9 +338,15 @@ export type Database = {
           cancel_reason: string | null
           created_at: string
           created_by: string | null
+          customer_id: string | null
+          discount_amount: number | null
+          discount_percent: number | null
           id: string
           origin: string
           payment_method: string
+          printed_at: string | null
+          receipt_requested: boolean | null
+          receipt_tax_id: string | null
           sale_number: number
           session_id: string | null
           sold_at: string
@@ -352,9 +358,15 @@ export type Database = {
           cancel_reason?: string | null
           created_at?: string
           created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
           id?: string
           origin?: string
           payment_method?: string
+          printed_at?: string | null
+          receipt_requested?: boolean | null
+          receipt_tax_id?: string | null
           sale_number?: number
           session_id?: string | null
           sold_at?: string
@@ -366,9 +378,15 @@ export type Database = {
           cancel_reason?: string | null
           created_at?: string
           created_by?: string | null
+          customer_id?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
           id?: string
           origin?: string
           payment_method?: string
+          printed_at?: string | null
+          receipt_requested?: boolean | null
+          receipt_tax_id?: string | null
           sale_number?: number
           session_id?: string | null
           sold_at?: string

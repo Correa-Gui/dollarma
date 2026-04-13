@@ -28,10 +28,9 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Validate terminal
   const { data: terminal, error: termErr } = await supabase
     .from("pdv_terminals")
     .select("id")
@@ -55,61 +54,65 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { payment_method, items, session_id, customer_id } = body;
+  const {
+    payment_method,
+    items,
+    session_id,
+    customer_id,
+    discount_percent,
+    receipt_requested,
+    receipt_tax_id,
+  } = body;
 
   if (!payment_method || !Array.isArray(items) || items.length === 0) {
     return new Response(
-      JSON.stringify({ error: "payment_method, items[] are required" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: "payment_method e items[] sao obrigatorios" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
   if (!session_id) {
     return new Response(
       JSON.stringify({ error: "session_id is required (open cash register session)" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
-  // Calculate total
-  let total = 0;
+  let subtotal = 0;
   const saleItems: any[] = [];
 
   for (const item of items) {
     if ((!item.product_id && !item.barcode && !item.sku) || !item.quantity || item.quantity <= 0) {
       return new Response(
-        JSON.stringify({ error: "Each item needs product_id (or barcode/sku) and quantity > 0" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Cada item precisa de product_id (ou barcode/sku) e quantity > 0" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     let product: any = null;
 
-    // Tenta por UUID primeiro
     if (item.product_id) {
       const { data } = await supabase
         .from("products")
-        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .select("id, name, sku, barcode, sale_price, promo_price, promo_start, promo_end, stock_quantity")
         .eq("id", item.product_id)
         .maybeSingle();
       product = data;
     }
 
-    // Fallback por barcode
     if (!product && item.barcode) {
       const { data } = await supabase
         .from("products")
-        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .select("id, name, sku, barcode, sale_price, promo_price, promo_start, promo_end, stock_quantity")
         .eq("barcode", item.barcode)
         .maybeSingle();
       product = data;
     }
 
-    // Fallback por SKU
     if (!product && item.sku) {
       const { data } = await supabase
         .from("products")
-        .select("id, name, sale_price, promo_price, promo_start, promo_end, stock_quantity")
+        .select("id, name, sku, barcode, sale_price, promo_price, promo_start, promo_end, stock_quantity")
         .eq("sku", item.sku)
         .maybeSingle();
       product = data;
@@ -119,35 +122,42 @@ Deno.serve(async (req) => {
       const identifier = item.barcode ?? item.sku ?? item.product_id;
       return new Response(
         JSON.stringify({ error: `Product not found: ${identifier}` }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Check promo
     const now = new Date().toISOString().slice(0, 10);
-    let price = Number(product.sale_price);
+    let unitPrice = Number(product.sale_price);
     if (product.promo_price && product.promo_start && product.promo_end) {
       if (now >= product.promo_start && now <= product.promo_end) {
-        price = Number(product.promo_price);
+        unitPrice = Number(product.promo_price);
       }
     }
 
-    const subtotal = +(price * item.quantity).toFixed(2);
-    total += subtotal;
+    if (item.unit_price && Number(item.unit_price) >= 0) {
+      unitPrice = Number(item.unit_price);
+    }
+
+    const lineSubtotal = +(unitPrice * item.quantity).toFixed(2);
+    subtotal += lineSubtotal;
 
     saleItems.push({
       product_id: product.id,
       product_name: product.name,
+      product_sku: product.sku,
+      barcode: product.barcode,
       quantity: item.quantity,
-      unit_price: price,
-      subtotal,
+      unit_price: unitPrice,
+      subtotal: lineSubtotal,
       _prev_stock: product.stock_quantity,
     });
   }
 
-  total = +total.toFixed(2);
+  subtotal = +subtotal.toFixed(2);
+  const parsedDiscountPercent = Math.max(0, Math.min(Number(discount_percent ?? 0), 100));
+  const discountAmount = +((subtotal * parsedDiscountPercent) / 100).toFixed(2);
+  const total = +(subtotal - discountAmount).toFixed(2);
 
-  // Insert sale
   const { data: sale, error: saleErr } = await supabase
     .from("sales")
     .insert({
@@ -158,6 +168,10 @@ Deno.serve(async (req) => {
       total,
       status: "completed",
       sold_at: new Date().toISOString(),
+      discount_percent: parsedDiscountPercent,
+      discount_amount: discountAmount,
+      receipt_requested: Boolean(receipt_requested),
+      receipt_tax_id: receipt_tax_id ?? null,
       ...(customer_id ? { customer_id } : {}),
     })
     .select("id, sale_number")
@@ -170,7 +184,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Insert sale items + update stock + create movements
   for (const si of saleItems) {
     const prevStock = si._prev_stock;
     const newStock = prevStock - si.quantity;
@@ -179,6 +192,7 @@ Deno.serve(async (req) => {
       sale_id: sale.id,
       product_id: si.product_id,
       product_name: si.product_name,
+      product_sku: si.product_sku,
       quantity: si.quantity,
       unit_price: si.unit_price,
       subtotal: si.subtotal,
@@ -207,6 +221,6 @@ Deno.serve(async (req) => {
       total,
       items_count: saleItems.length,
     }),
-    { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });

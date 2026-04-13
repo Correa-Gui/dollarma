@@ -160,9 +160,19 @@ const FiscalReport = () => {
 
                     {/* Rodapé da venda */}
                     <div className="bg-muted/30 print:bg-gray-50 px-4 py-2 flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground print:text-gray-600">
-                        Pagamento: {paymentLabels[sale.payment_method] ?? sale.payment_method}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-muted-foreground print:text-gray-600">
+                          Pagamento: {paymentLabels[sale.payment_method] ?? sale.payment_method}
+                        </span>
+                        {Number(sale.discount_amount ?? 0) > 0 && (
+                          <span className="text-amber-700 print:text-black font-medium">
+                            Desconto: {fmtCurrency(Number(sale.discount_amount ?? 0))}
+                            {Number(sale.discount_percent ?? 0) > 0
+                              ? ` (${Number(sale.discount_percent ?? 0).toFixed(2)}%)`
+                              : ""}
+                          </span>
+                        )}
+                      </div>
                       <span className="font-bold tabular-nums">{fmtCurrency(Number(sale.total))}</span>
                     </div>
                   </div>

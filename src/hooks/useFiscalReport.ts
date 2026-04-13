@@ -17,6 +17,8 @@ export type FiscalSale = {
   sale_number: number;
   sold_at: string;
   total: number;
+  discount_amount: number | null;
+  discount_percent: number | null;
   status: string;
   payment_method: string;
   origin: string;
@@ -39,7 +41,7 @@ export function useFiscalReport(from: string, to: string) {
       const { data, error } = await (supabase as any)
         .from("sales")
         .select(`
-          id, sale_number, sold_at, total, status, payment_method, origin,
+          id, sale_number, sold_at, total, discount_amount, discount_percent, status, payment_method, origin,
           customers(name, cpf),
           sale_items(
             id, product_name, product_sku, ncm_code, quantity, unit_price, subtotal,

@@ -8,12 +8,13 @@ import { toast } from "sonner";
 
 const BASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
 
-type MethodBadgeProps = { method: "GET" | "POST" | "PUT" | "DELETE" };
+type MethodBadgeProps = { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" };
 const MethodBadge = ({ method }: MethodBadgeProps) => {
   const colors: Record<string, string> = {
     GET: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     POST: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     PUT: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    PATCH: "bg-violet-500/10 text-violet-600 border-violet-500/20",
     DELETE: "bg-red-500/10 text-red-600 border-red-500/20",
   };
   return <span className={`px-2 py-0.5 rounded text-xs font-bold border ${colors[method]}`}>{method}</span>;
@@ -36,7 +37,7 @@ const CodeBlock = ({ code, lang = "json" }: { code: string; lang?: string }) => 
 );
 
 type EndpointProps = {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PUT" | "PATCH";
   path: string;
   title: string;
   description: string;
@@ -212,6 +213,124 @@ const endpoints: EndpointProps[] = [
     curlExample: `curl -X GET \\
   ${BASE_URL}/pdv-catalog \\
   -H "x-pdv-token: tk_live_abc123def456"`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-products",
+    title: "Cadastrar Produto",
+    description: "Cadastra um novo produto direto pelo PDV ou pelo painel. O nome e o SKU são obrigatórios. Se o endpoint retornar 404 no ambiente publicado, a function precisa ser redeployada no Supabase.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      name: "Coca-Cola 350ml",
+      sku: "SKU001",
+      barcode: "7891234567890",
+      sale_price: 5.5,
+      cost_price: 3.2,
+      stock_quantity: 120,
+      min_stock: 12,
+      unit: "un",
+      is_active: true,
+    }, null, 2),
+    responses: [
+      {
+        status: 201,
+        label: "Criado",
+        body: JSON.stringify({
+          product: {
+            id: "a1b2c3d4-...",
+            name: "Coca-Cola 350ml",
+            sku: "SKU001",
+            barcode: "7891234567890",
+            sale_price: 5.5,
+            cost_price: 3.2,
+            stock_quantity: 120,
+            min_stock: 12,
+            unit: "un",
+            is_active: true,
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "name e sku sao obrigatorios" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-products \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Coca-Cola 350ml",
+    "sku": "SKU001",
+    "barcode": "7891234567890",
+    "sale_price": 5.5,
+    "cost_price": 3.2,
+    "stock_quantity": 120
+  }'`,
+  },
+  {
+    method: "PATCH",
+    path: "/pdv-products",
+    title: "Atualizar Produto",
+    description: "Atualiza um produto existente. Envie o id e apenas os campos que deseja alterar. A function aceita PUT ou PATCH no ambiente publicado.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      id: "a1b2c3d4-...",
+      sale_price: 5.9,
+      stock_quantity: 118,
+      is_active: true,
+    }, null, 2),
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          product: {
+            id: "a1b2c3d4-...",
+            name: "Coca-Cola 350ml",
+            sku: "SKU001",
+            barcode: "7891234567890",
+            sale_price: 5.9,
+            cost_price: 3.2,
+            stock_quantity: 118,
+            min_stock: 12,
+            unit: "un",
+            is_active: true,
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "id do produto e obrigatorio" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X PATCH \\
+  ${BASE_URL}/pdv-products \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "id": "a1b2c3d4-...",
+    "sale_price": 5.9,
+    "stock_quantity": 118
+  }'`,
   },
   {
     method: "POST",
