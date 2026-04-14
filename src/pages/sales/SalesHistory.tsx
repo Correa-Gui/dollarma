@@ -47,6 +47,33 @@ const paymentLabel = (value: string) => {
   }
 };
 
+const getItemsSubtotal = (sale: Sale) =>
+  (sale.sale_items ?? []).reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0);
+
+const getEffectiveDiscountAmount = (sale: Sale) => {
+  const explicitDiscount = Number(sale.discount_amount ?? 0);
+  if (explicitDiscount > 0) {
+    return explicitDiscount;
+  }
+
+  const inferredDiscount = Math.max(getItemsSubtotal(sale) - Number(sale.total ?? 0), 0);
+  return Number(inferredDiscount.toFixed(2));
+};
+
+const getEffectiveDiscountPercent = (sale: Sale) => {
+  const explicitPercent = Number(sale.discount_percent ?? 0);
+  if (explicitPercent > 0) {
+    return explicitPercent;
+  }
+
+  const subtotal = getItemsSubtotal(sale);
+  if (subtotal <= 0) {
+    return 0;
+  }
+
+  return Number(((getEffectiveDiscountAmount(sale) / subtotal) * 100).toFixed(2));
+};
+
 const SalesHistory = () => {
   const { data: sales = [], isLoading } = useSales();
   const { data: customers = [] } = useCustomers();
@@ -62,8 +89,8 @@ const SalesHistory = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [linkingCustomer, setLinkingCustomer] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
-  const selectedDiscountAmount = Number(detailSale?.discount_amount ?? 0);
-  const selectedDiscountPercent = Number(detailSale?.discount_percent ?? 0);
+  const selectedDiscountAmount = detailSale ? getEffectiveDiscountAmount(detailSale) : 0;
+  const selectedDiscountPercent = detailSale ? getEffectiveDiscountPercent(detailSale) : 0;
 
   const filtered = sales.filter((s) => {
     const matchSearch =
@@ -173,8 +200,8 @@ const SalesHistory = () => {
                 <TableCell className="text-center text-sm tabular-nums">{s.sale_items?.length ?? 0}</TableCell>
                 <TableCell className="text-sm">{paymentLabel(s.payment_method)}</TableCell>
                 <TableCell className="text-right text-sm tabular-nums">
-                  {Number(s.discount_amount ?? 0) > 0
-                    ? `${fmt(Number(s.discount_amount))}${Number(s.discount_percent ?? 0) > 0 ? ` (${Number(s.discount_percent).toFixed(2)}%)` : ""}`
+                  {getEffectiveDiscountAmount(s) > 0
+                    ? `${fmt(getEffectiveDiscountAmount(s))}${getEffectiveDiscountPercent(s) > 0 ? ` (${getEffectiveDiscountPercent(s).toFixed(2)}%)` : ""}`
                     : "—"}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-sm tabular-nums">{fmt(Number(s.total))}</TableCell>
