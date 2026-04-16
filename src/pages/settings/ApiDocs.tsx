@@ -37,7 +37,7 @@ const CodeBlock = ({ code, lang = "json" }: { code: string; lang?: string }) => 
 );
 
 type EndpointProps = {
-  method: "GET" | "POST" | "PUT" | "PATCH";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   title: string;
   description: string;
@@ -176,7 +176,7 @@ const endpoints: EndpointProps[] = [
     method: "GET",
     path: "/pdv-catalog",
     title: "Catálogo de Produtos",
-    description: "Retorna todos os produtos ativos com preços, promoções e estoque. O terminal é atualizado como 'online' e a data de última sincronização é registrada.",
+    description: "Retorna os produtos ativos com preços, promoções e estoque. Aceita o parâmetro opcional 'search' para busca por termos, com correspondência flexível entre as palavras. O terminal é atualizado como 'online' e a data de última sincronização é registrada.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV cadastrado no sistema" },
     ],
@@ -215,10 +215,146 @@ const endpoints: EndpointProps[] = [
   -H "x-pdv-token: tk_live_abc123def456"`,
   },
   {
+    method: "GET",
+    path: "/pdv-reference-data",
+    title: "Dados de Referência",
+    description: "Retorna as listas de categorias e fornecedores usadas pelos formulários do PDV. O endpoint é usado para preencher selects de cadastro e edição de produto.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+    ],
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          categories: [
+            { id: "cat-1", name: "Bebidas", parent_id: null },
+          ],
+          suppliers: [
+            {
+              id: "sup-1",
+              name: "Distribuidora XYZ",
+              cnpj: "12.345.678/0001-99",
+              contact: "Ana",
+              phone: "(11) 99999-9999",
+              email: "contato@xyz.com",
+              avg_delivery_days: 3,
+              notes: null,
+            },
+          ],
+        }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X GET \\
+  ${BASE_URL}/pdv-reference-data \\
+  -H "x-pdv-token: tk_live_abc123def456"`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-categories",
+    title: "Criar Categoria",
+    description: "Cria uma nova categoria para uso no cadastro de produtos. O nome é obrigatório. O parent_id é opcional.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      name: "Bebidas",
+      parent_id: null,
+    }, null, 2),
+    responses: [
+      {
+        status: 201,
+        label: "Criado",
+        body: JSON.stringify({
+          category: {
+            id: "cat-1",
+            name: "Bebidas",
+            parent_id: null,
+            created_at: "2026-04-14T10:00:00Z",
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "name is required" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-categories \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Bebidas"}'`,
+  },
+  {
+    method: "POST",
+    path: "/pdv-suppliers",
+    title: "Criar Fornecedor",
+    description: "Cria um fornecedor para uso no cadastro de produtos. O nome é obrigatório; os demais campos são opcionais.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      name: "Distribuidora XYZ",
+      cnpj: "12.345.678/0001-99",
+      contact: "Ana",
+      phone: "(11) 99999-9999",
+      email: "contato@xyz.com",
+      avg_delivery_days: 3,
+      notes: "Entrega semanal",
+    }, null, 2),
+    responses: [
+      {
+        status: 201,
+        label: "Criado",
+        body: JSON.stringify({
+          supplier: {
+            id: "sup-1",
+            name: "Distribuidora XYZ",
+            cnpj: "12.345.678/0001-99",
+            contact: "Ana",
+            phone: "(11) 99999-9999",
+            email: "contato@xyz.com",
+            avg_delivery_days: 3,
+            notes: "Entrega semanal",
+            created_at: "2026-04-14T10:00:00Z",
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "name is required" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X POST \\
+  ${BASE_URL}/pdv-suppliers \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Distribuidora XYZ"}'`,
+  },
+  {
     method: "POST",
     path: "/pdv-products",
     title: "Cadastrar Produto",
-    description: "Cadastra um novo produto direto pelo PDV ou pelo painel. O nome e o SKU são obrigatórios. Se o endpoint retornar 404 no ambiente publicado, a function precisa ser redeployada no Supabase.",
+    description: "Cadastra um novo produto direto pelo PDV ou pelo painel. O nome e o SKU são obrigatórios. O SKU pode ser gerado pelo cliente, e o cadastro suporta categoria, fornecedor, NCM e CFOP.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
@@ -227,6 +363,10 @@ const endpoints: EndpointProps[] = [
       name: "Coca-Cola 350ml",
       sku: "SKU001",
       barcode: "7891234567890",
+      category_id: "cat-1",
+      supplier_id: "sup-1",
+      ncm: "22021000",
+      cfop: "5102",
       sale_price: 5.5,
       cost_price: 3.2,
       stock_quantity: 120,
@@ -244,6 +384,10 @@ const endpoints: EndpointProps[] = [
             name: "Coca-Cola 350ml",
             sku: "SKU001",
             barcode: "7891234567890",
+            category_id: "cat-1",
+            supplier_id: "sup-1",
+            ncm: "22021000",
+            cfop: "5102",
             sale_price: 5.5,
             cost_price: 3.2,
             stock_quantity: 120,
@@ -272,6 +416,10 @@ const endpoints: EndpointProps[] = [
     "name": "Coca-Cola 350ml",
     "sku": "SKU001",
     "barcode": "7891234567890",
+    "category_id": "cat-1",
+    "supplier_id": "sup-1",
+    "ncm": "22021000",
+    "cfop": "5102",
     "sale_price": 5.5,
     "cost_price": 3.2,
     "stock_quantity": 120
@@ -288,8 +436,18 @@ const endpoints: EndpointProps[] = [
     ],
     requestBody: JSON.stringify({
       id: "a1b2c3d4-...",
+      name: "Coca-Cola 350ml",
+      sku: "SKU001",
+      barcode: "7891234567890",
+      category_id: "cat-1",
+      supplier_id: "sup-1",
+      ncm: "22021000",
+      cfop: "5102",
       sale_price: 5.9,
+      cost_price: 3.2,
       stock_quantity: 118,
+      min_stock: 12,
+      unit: "un",
       is_active: true,
     }, null, 2),
     responses: [
@@ -302,6 +460,10 @@ const endpoints: EndpointProps[] = [
             name: "Coca-Cola 350ml",
             sku: "SKU001",
             barcode: "7891234567890",
+            category_id: "cat-1",
+            supplier_id: "sup-1",
+            ncm: "22021000",
+            cfop: "5102",
             sale_price: 5.9,
             cost_price: 3.2,
             stock_quantity: 118,
@@ -328,15 +490,53 @@ const endpoints: EndpointProps[] = [
   -H "Content-Type: application/json" \\
   -d '{
     "id": "a1b2c3d4-...",
+    "name": "Coca-Cola 350ml",
     "sale_price": 5.9,
-    "stock_quantity": 118
+    "stock_quantity": 118,
+    "category_id": "cat-1",
+    "supplier_id": "sup-1",
+    "ncm": "22021000",
+    "cfop": "5102"
   }'`,
+  },
+  {
+    method: "DELETE",
+    path: "/pdv-products",
+    title: "Excluir Produto",
+    description: "Exclui um produto do cadastro base. O PDV usa esse endpoint para remover produtos quando o usuário confirma a exclusão na tela de edição.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({ id: "a1b2c3d4-..." }, null, 2),
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({ success: true }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "id do produto e obrigatorio" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X DELETE \\
+  ${BASE_URL}/pdv-products \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"id":"a1b2c3d4-..."}'`,
   },
   {
     method: "POST",
     path: "/pdv-sales",
     title: "Registrar Venda",
-    description: "Registra uma nova venda vinculada a uma sessão de caixa aberta. Automaticamente: cria os itens da venda, debita o estoque de cada produto e gera movimentações de saída.",
+    description: "Registra uma nova venda vinculada a uma sessão de caixa aberta. Automaticamente: cria os itens da venda, debita o estoque de cada produto e gera movimentações de saída. Suporta cliente opcional, desconto percentual e comprovante de venda.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
@@ -345,6 +545,9 @@ const endpoints: EndpointProps[] = [
       session_id: "uuid-da-sessao-aberta",
       payment_method: "pix",
       customer_id: "uuid-do-cliente (opcional)",
+      discount_percent: 5,
+      receipt_requested: true,
+      receipt_tax_id: "12.345.678/0001-99",
       items: [
         { product_id: "a1b2c3d4-...", quantity: 2 },
         { product_id: "e5f6g7h8-...", quantity: 1, barcode: "7891234567890" },
@@ -380,6 +583,9 @@ const endpoints: EndpointProps[] = [
     "session_id": "uuid-da-sessao",
     "payment_method": "pix",
     "customer_id": "uuid-do-cliente",
+    "discount_percent": 5,
+    "receipt_requested": true,
+    "receipt_tax_id": "12.345.678/0001-99",
     "items": [
       { "product_id": "a1b2c3d4-...", "quantity": 2 },
       { "barcode": "7891234567890", "quantity": 1 }
@@ -390,7 +596,7 @@ const endpoints: EndpointProps[] = [
     method: "GET",
     path: "/pdv-customers",
     title: "Buscar Clientes",
-    description: "Retorna a lista de clientes cadastrados. Use o parâmetro 'search' para filtrar por nome, CPF, telefone ou e-mail. Limite máximo de 200 registros por requisição.",
+    description: "Retorna a lista de clientes cadastrados. Use o parâmetro 'search' para filtrar por nome, CPF/CNPJ, telefone ou e-mail com correspondência flexível entre os termos. Limite máximo de 200 registros por requisição.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
     ],
@@ -425,16 +631,16 @@ curl -X GET \\
   "${BASE_URL}/pdv-customers" \\
   -H "x-pdv-token: tk_live_abc123def456"
 
-# Buscar por nome, CPF ou telefone
+# Buscar por nome, CPF/CNPJ ou telefone
 curl -X GET \\
-  "${BASE_URL}/pdv-customers?search=Maria&limit=20" \\
+  "${BASE_URL}/pdv-customers?search=Maria Silva&limit=20" \\
   -H "x-pdv-token: tk_live_abc123def456"`,
   },
   {
     method: "POST",
     path: "/pdv-customers",
     title: "Criar Cliente",
-    description: "Cadastra um novo cliente diretamente pelo PDV. O nome é obrigatório. Se o CPF já estiver cadastrado, retorna 409 com o ID do cliente existente.",
+    description: "Cadastra um novo cliente diretamente pelo PDV. O nome é obrigatório. Se o CPF/CNPJ já estiver cadastrado, retorna 409 com o ID do cliente existente.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },
@@ -466,8 +672,8 @@ curl -X GET \\
       },
       {
         status: 409,
-        label: "CPF duplicado",
-        body: JSON.stringify({ error: "CPF já cadastrado para: João Silva", existing_id: "uuid-existente" }, null, 2),
+        label: "CPF/CNPJ duplicado",
+        body: JSON.stringify({ error: "CPF/CNPJ já cadastrado para: João Silva", existing_id: "uuid-existente" }, null, 2),
       },
       {
         status: 400,
@@ -484,6 +690,95 @@ curl -X GET \\
     "cpf": "123.456.789-00",
     "phone": "(11) 99999-9999"
   }'`,
+  },
+  {
+    method: "PUT",
+    path: "/pdv-customers",
+    title: "Atualizar Cliente",
+    description: "Atualiza um cliente já cadastrado no PDV. O id é obrigatório e o nome continua obrigatório na atualização.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({
+      id: "a1b2c3d4-...",
+      name: "Maria Silva",
+      cpf: "123.456.789-00",
+      phone: "(11) 99999-9999",
+      email: "maria@email.com",
+      address: "Rua das Flores, 10",
+      notes: "Cliente preferencial",
+    }, null, 2),
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({
+          customer: {
+            id: "a1b2c3d4-...",
+            name: "Maria Silva",
+            cpf: "123.456.789-00",
+            phone: "(11) 99999-9999",
+            email: "maria@email.com",
+            address: "Rua das Flores, 10",
+            notes: "Cliente preferencial",
+            created_at: "2026-03-27T10:00:00Z",
+          },
+        }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "id is required" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X PUT \\
+  ${BASE_URL}/pdv-customers \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "id": "a1b2c3d4-...",
+    "name": "Maria Silva",
+    "phone": "(11) 99999-9999"
+  }'`,
+  },
+  {
+    method: "DELETE",
+    path: "/pdv-customers",
+    title: "Excluir Cliente",
+    description: "Remove um cliente do cadastro do PDV. O id é obrigatório.",
+    headers: [
+      { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
+      { name: "Content-Type", required: true, description: "application/json" },
+    ],
+    requestBody: JSON.stringify({ id: "a1b2c3d4-..." }, null, 2),
+    responses: [
+      {
+        status: 200,
+        label: "Sucesso",
+        body: JSON.stringify({ success: true }, null, 2),
+      },
+      {
+        status: 400,
+        label: "Dados inválidos",
+        body: JSON.stringify({ error: "id is required" }, null, 2),
+      },
+      {
+        status: 401,
+        label: "Não autorizado",
+        body: JSON.stringify({ error: "Invalid terminal token" }, null, 2),
+      },
+    ],
+    curlExample: `curl -X DELETE \\
+  ${BASE_URL}/pdv-customers \\
+  -H "x-pdv-token: tk_live_abc123def456" \\
+  -H "Content-Type: application/json" \\
+  -d '{"id":"a1b2c3d4-..."}'`,
   },
   {
     method: "POST",
@@ -610,7 +905,7 @@ curl -X GET \\
     method: "GET",
     path: "/pdv-store-settings",
     title: "Configurações da Loja",
-    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário, moeda e logo.",
+    description: "Retorna as configurações gerais da loja: nome, CNPJ, endereço, fuso horário, moeda e logo, com CNPJ formatado para exibição.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
     ],

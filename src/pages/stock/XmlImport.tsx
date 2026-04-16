@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FileUp, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { TablesInsert } from "@/integrations/supabase/types";
+import { formatCpfCnpjPartial, trimText } from "@/lib/format";
 
 type XmlSupplier = { cnpj: string; name: string };
 
@@ -69,7 +70,7 @@ const XmlImport = () => {
     // Emitente
     const emitEl = doc.getElementsByTagName("emit")[0];
     const supplier: XmlSupplier = {
-      cnpj: getTag(emitEl ?? doc, "CNPJ"),
+      cnpj: formatCpfCnpjPartial(getTag(emitEl ?? doc, "CNPJ")),
       name: getTag(emitEl ?? doc, "xNome") || getTag(emitEl ?? doc, "xFant") || "Fornecedor desconhecido",
     };
     setXmlSupplier(supplier);
@@ -162,7 +163,7 @@ const XmlImport = () => {
       if (!matchedSupplierId && createNewSupplier && xmlSupplier) {
         const { data: newSupplier, error } = await supabase
           .from("suppliers")
-          .insert({ name: xmlSupplier.name, cnpj: xmlSupplier.cnpj } as TablesInsert<"suppliers">)
+          .insert({ name: trimText(xmlSupplier.name), cnpj: xmlSupplier.cnpj } as TablesInsert<"suppliers">)
           .select()
           .single();
         if (error) throw error;
@@ -184,7 +185,7 @@ const XmlImport = () => {
             // Backfill NCM se produto ainda não tem
             if (item.ncm) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await (supabase as any).from("products").update({ ncm: item.ncm }).eq("id", item.existingId).is("ncm", null);
+              await (supabase as any).from("products").update({ ncm: trimText(item.ncm) }).eq("id", item.existingId).is("ncm", null);
             }
             if (item.addStock && item.qty > 0) {
               const newQty = item.existingStock + item.qty;
@@ -203,9 +204,9 @@ const XmlImport = () => {
             // Produto novo
             const sku = String(skuCounter++).padStart(6, "0");
             const { data: newProduct, error } = await (supabase as any).from("products").insert({
-              name: item.xmlName,
+              name: trimText(item.xmlName),
               sku,
-              barcode: item.ean && item.ean !== "SEM GTIN" ? item.ean : null,
+              barcode: item.ean && item.ean !== "SEM GTIN" ? trimText(item.ean) : null,
               cost_price: item.cost,
               sale_price: parseFloat((item.cost * 1.3).toFixed(2)),
               stock_quantity: item.qty,
@@ -213,7 +214,7 @@ const XmlImport = () => {
               unit: item.unit,
               supplier_id: supplierId,
               is_active: true,
-              ncm: item.ncm || null,
+              ncm: trimText(item.ncm) || null,
             }).select().single();
 
             if (error || !newProduct) {
@@ -326,7 +327,7 @@ const XmlImport = () => {
       {xmlSupplier && (
         <div className="rounded-lg border p-3 space-y-1 text-sm">
           <p className="font-medium">Fornecedor da NF-e</p>
-          <p className="text-muted-foreground">{xmlSupplier.name} — CNPJ: {xmlSupplier.cnpj}</p>
+          <p className="text-muted-foreground">{trimText(xmlSupplier.name)} — CNPJ: {xmlSupplier.cnpj}</p>
           {matchedSupplierId ? (
             <p className="text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Fornecedor encontrado no cadastro</p>
           ) : (

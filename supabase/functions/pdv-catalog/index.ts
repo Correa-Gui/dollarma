@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildLooseLikePattern } from "../_shared/search.ts";
+import { trimOptionalText, trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,10 +30,9 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Validate terminal token
   const { data: terminal, error: termErr } = await supabase
     .from("pdv_terminals")
     .select("id, name")
@@ -45,18 +46,26 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Update last_sync and status
   await supabase
     .from("pdv_terminals")
     .update({ last_sync: new Date().toISOString(), status: "online" })
     .eq("id", terminal.id);
 
-  // Fetch active products with category name
-  const { data: products, error: prodErr } = await supabase
+  const url = new URL(req.url);
+  const search = url.searchParams.get("search") ?? "";
+  const like = buildLooseLikePattern(search);
+
+  let productsQuery = supabase
     .from("products")
-    .select("id, sku, barcode, name, sale_price, promo_price, promo_start, promo_end, stock_quantity, unit, image_url, category_id, categories(name)")
+    .select("id, sku, barcode, name, sale_price, cost_price, promo_price, promo_start, promo_end, stock_quantity, unit, image_url, category_id, supplier_id, ncm, cfop, categories(name), suppliers(name)")
     .eq("is_active", true)
     .order("name");
+
+  if (search.trim()) {
+    productsQuery = productsQuery.or(`name.ilike.${like},sku.ilike.${like},barcode.ilike.${like}`);
+  }
+
+  const { data: products, error: prodErr } = await productsQuery;
 
   if (prodErr) {
     return new Response(JSON.stringify({ error: prodErr.message }), {
@@ -67,17 +76,23 @@ Deno.serve(async (req) => {
 
   const catalog = (products || []).map((p: any) => ({
     id: p.id,
-    sku: p.sku,
-    barcode: p.barcode,
-    name: p.name,
+    sku: trimText(p.sku),
+    barcode: trimOptionalText(p.barcode),
+    name: trimText(p.name),
     price: Number(p.sale_price),
+    cost_price: p.cost_price !== null && typeof p.cost_price !== "undefined" ? Number(p.cost_price) : null,
     promoPrice: p.promo_price ? Number(p.promo_price) : null,
     promoStart: p.promo_start,
     promoEnd: p.promo_end,
     stock: p.stock_quantity,
-    unit: p.unit,
+    unit: trimText(p.unit),
     imageUrl: p.image_url,
-    category: p.categories?.name ?? null,
+    category_id: p.category_id,
+    supplier_id: p.supplier_id,
+    ncm: p.ncm ?? null,
+    cfop: p.cfop ?? null,
+    category: trimOptionalText(p.categories?.name),
+    supplier: trimOptionalText(p.suppliers?.name),
   }));
 
   return new Response(JSON.stringify({ terminal: terminal.name, catalog }), {

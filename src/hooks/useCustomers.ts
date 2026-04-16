@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { logAudit } from "./useAuditLog";
+import { formatCpfCnpj, formatCpfCnpjPartial, trimOptionalText, trimText } from "@/lib/format";
 
 export type Customer = {
   id: string;
@@ -26,7 +27,15 @@ export function useCustomers() {
         .select("*")
         .order("name");
       if (error) throw error;
-      return data as Customer[];
+      return ((data ?? []) as Customer[]).map((customer) => ({
+        ...customer,
+        name: trimText(customer.name),
+        cpf: customer.cpf ? formatCpfCnpjPartial(customer.cpf) : null,
+        phone: trimOptionalText(customer.phone),
+        email: trimOptionalText(customer.email),
+        address: trimOptionalText(customer.address),
+        notes: trimOptionalText(customer.notes),
+      }));
     },
   });
 }
@@ -35,13 +44,30 @@ export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (customer: Omit<Customer, "id" | "created_at">) => {
+      const payload = {
+        ...customer,
+        name: trimText(customer.name),
+        cpf: formatCpfCnpj(customer.cpf),
+        phone: trimOptionalText(customer.phone),
+        email: trimOptionalText(customer.email),
+        address: trimOptionalText(customer.address),
+        notes: trimOptionalText(customer.notes),
+      };
       const { data, error } = await anySupabase
         .from("customers")
-        .insert(customer)
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
-      return data as Customer;
+      return {
+        ...(data as Customer),
+        name: trimText(data.name),
+        cpf: data.cpf ? formatCpfCnpjPartial(data.cpf) : null,
+        phone: trimOptionalText(data.phone),
+        email: trimOptionalText(data.email),
+        address: trimOptionalText(data.address),
+        notes: trimOptionalText(data.notes),
+      };
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["customers"] });
@@ -56,14 +82,31 @@ export function useUpdateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Omit<Customer, "created_at">> & { id: string }) => {
+      const payload = {
+        ...updates,
+        name: updates.name ? trimText(updates.name) : updates.name,
+        cpf: updates.cpf === undefined ? undefined : formatCpfCnpj(updates.cpf),
+        phone: updates.phone === undefined ? undefined : trimOptionalText(updates.phone),
+        email: updates.email === undefined ? undefined : trimOptionalText(updates.email),
+        address: updates.address === undefined ? undefined : trimOptionalText(updates.address),
+        notes: updates.notes === undefined ? undefined : trimOptionalText(updates.notes),
+      };
       const { data, error } = await anySupabase
         .from("customers")
-        .update(updates)
+        .update(payload)
         .eq("id", id)
         .select()
         .single();
       if (error) throw error;
-      return data as Customer;
+      return {
+        ...(data as Customer),
+        name: trimText(data.name),
+        cpf: data.cpf ? formatCpfCnpjPartial(data.cpf) : null,
+        phone: trimOptionalText(data.phone),
+        email: trimOptionalText(data.email),
+        address: trimOptionalText(data.address),
+        notes: trimOptionalText(data.notes),
+      };
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["customers"] });

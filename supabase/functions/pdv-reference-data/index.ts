@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { formatCpfCnpjPartial, trimOptionalText, trimText } from "../_shared/format.ts";
+import { trimOptionalText, trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,15 +29,14 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Validate terminal token
   const { data: terminal, error: termErr } = await supabase
     .from("pdv_terminals")
-    .select("id, name")
+    .select("id")
     .eq("token", token)
-    .maybeSingle();
+    .single();
 
   if (termErr || !terminal) {
     return new Response(JSON.stringify({ error: "Invalid terminal token" }), {
@@ -46,44 +45,41 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Fetch store settings
-  const { data: settings, error: settErr } = await supabase
-    .from("store_settings")
-    .select("store_name, cnpj, address, timezone, currency, logo_url")
-    .limit(1)
-    .maybeSingle();
+  const [categoriesResult, suppliersResult] = await Promise.all([
+    supabase.from("categories").select("id, name, parent_id").order("name"),
+    supabase.from("suppliers").select("id, name, cnpj, contact, phone, email, avg_delivery_days, notes").order("name"),
+  ]);
 
-  if (settErr) {
-    return new Response(JSON.stringify({ error: "Failed to fetch store settings" }), {
+  if (categoriesResult.error) {
+    return new Response(JSON.stringify({ error: categoriesResult.error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  return new Response(
-    JSON.stringify({
-      terminal: trimText(terminal.name),
-      settings: settings
-        ? {
-            store_name: trimText(settings.store_name),
-            cnpj: settings.cnpj ? formatCpfCnpjPartial(settings.cnpj) : null,
-            address: trimOptionalText(settings.address),
-            timezone: trimText(settings.timezone),
-            currency: trimText(settings.currency),
-            logo_url: trimOptionalText(settings.logo_url),
-          }
-        : {
-            store_name: "Minha Loja",
-            cnpj: null,
-            address: null,
-            timezone: "America/Sao_Paulo",
-            currency: "BRL",
-            logo_url: null,
-          },
-    }),
-    {
-      status: 200,
+  if (suppliersResult.error) {
+    return new Response(JSON.stringify({ error: suppliersResult.error.message }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
-  );
+    });
+  }
+
+  return new Response(JSON.stringify({
+    categories: (categoriesResult.data ?? []).map((category: any) => ({
+      ...category,
+      name: trimText(category.name),
+      parent_id: trimOptionalText(category.parent_id),
+    })),
+    suppliers: (suppliersResult.data ?? []).map((supplier: any) => ({
+      ...supplier,
+      name: trimText(supplier.name),
+      cnpj: trimOptionalText(supplier.cnpj),
+      contact: trimOptionalText(supplier.contact),
+      phone: trimOptionalText(supplier.phone),
+      email: trimOptionalText(supplier.email),
+      notes: trimOptionalText(supplier.notes),
+    })),
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });

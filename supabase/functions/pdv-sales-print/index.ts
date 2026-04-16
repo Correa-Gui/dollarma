@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { sale_id, printed_at, receipt_tax_id } = body;
+  const { sale_id, receipt_tax_id } = body;
   if (!sale_id) {
     return new Response(JSON.stringify({ error: "sale_id is required" }), {
       status: 400,
@@ -65,7 +65,6 @@ Deno.serve(async (req) => {
   const { error } = await supabase
     .from("sales")
     .update({
-      printed_at: printed_at ?? new Date().toISOString(),
       receipt_requested: true,
       receipt_tax_id: receipt_tax_id ?? null,
     })

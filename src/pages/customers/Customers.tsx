@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
+import { matchesLooseSearch } from "@/lib/search";
+import { formatCpfCnpjPartial, trimText } from "@/lib/format";
 
 type CustomerForm = Omit<Customer, "id" | "created_at">;
 
@@ -20,7 +22,7 @@ const emptyForm: CustomerForm = {
   name: "", cpf: null, phone: null, email: null, address: null, notes: null,
 };
 
-const nullify = (s: string) => s.trim() || null;
+const nullify = (s: string) => trimText(s) || null;
 
 const Customers = () => {
   const { data: customers = [], isLoading } = useCustomers();
@@ -34,10 +36,10 @@ const Customers = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const filtered = customers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.cpf ?? "").includes(search) ||
-    (c.phone ?? "").includes(search) ||
-    (c.email ?? "").toLowerCase().includes(search.toLowerCase())
+    matchesLooseSearch(
+      `${c.name} ${c.cpf ?? ""} ${c.phone ?? ""} ${c.email ?? ""}`,
+      search,
+    )
   );
 
   const openNew = () => { setEditing(emptyForm); setEditingId(null); setDialogOpen(true); };
@@ -50,7 +52,7 @@ const Customers = () => {
   const save = async () => {
     if (!editing.name.trim()) return;
     const payload = {
-      name: editing.name.trim(),
+      name: trimText(editing.name),
       cpf: nullify(editing.cpf ?? ""),
       phone: nullify(editing.phone ?? ""),
       email: nullify(editing.email ?? ""),
@@ -68,7 +70,10 @@ const Customers = () => {
   const field = (key: keyof CustomerForm) => ({
     value: editing[key] ?? "",
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setEditing({ ...editing, [key]: e.target.value }),
+      setEditing({
+        ...editing,
+        [key]: key === "cpf" ? formatCpfCnpjPartial(e.target.value) : e.target.value,
+      }),
   });
 
   if (isLoading) {
@@ -92,7 +97,7 @@ const Customers = () => {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar por nome, CPF, telefone..."
+          placeholder="Buscar por nome, CPF/CNPJ, telefone..."
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -104,7 +109,7 @@ const Customers = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead>CPF</TableHead>
+              <TableHead>CPF/CNPJ</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>E-mail</TableHead>
               <TableHead>Cadastrado em</TableHead>
@@ -148,7 +153,7 @@ const Customers = () => {
           <div className="grid gap-4 py-2">
             <div className="space-y-2"><Label>Nome *</Label><Input {...field("name")} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>CPF</Label><Input placeholder="000.000.000-00" {...field("cpf")} /></div>
+              <div className="space-y-2"><Label>CPF/CNPJ</Label><Input placeholder="000.000.000-00 ou 00.000.000/0000-00" {...field("cpf")} /></div>
               <div className="space-y-2"><Label>Telefone</Label><Input placeholder="(11) 99999-9999" {...field("phone")} /></div>
             </div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" placeholder="email@exemplo.com" {...field("email")} /></div>

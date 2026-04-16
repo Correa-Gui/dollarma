@@ -11,6 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { formatCpfCnpjPartial, trimText } from "@/lib/format";
 
 type SupplierForm = {
   name: string; cnpj: string; contact: string; phone: string; email: string;
@@ -41,11 +42,11 @@ const Suppliers = () => {
   };
 
   const save = async () => {
-    if (!editing.name) return;
+    if (!trimText(editing.name)) return;
     if (editingId) {
-      await updateSup.mutateAsync({ id: editingId, ...editing });
+      await updateSup.mutateAsync({ id: editingId, ...editing, name: trimText(editing.name), cnpj: formatCpfCnpjPartial(editing.cnpj) });
     } else {
-      await createSup.mutateAsync(editing);
+      await createSup.mutateAsync({ ...editing, name: trimText(editing.name), cnpj: formatCpfCnpjPartial(editing.cnpj) });
     }
     setDialogOpen(false);
   };
@@ -102,7 +103,7 @@ const Suppliers = () => {
           <div className="grid gap-4 py-2">
             <div className="space-y-2"><Label>Razão Social *</Label><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>CNPJ</Label><Input value={editing.cnpj} onChange={(e) => setEditing({ ...editing, cnpj: e.target.value })} /></div>
+              <div className="space-y-2"><Label>CNPJ</Label><Input value={editing.cnpj} onChange={(e) => setEditing({ ...editing, cnpj: formatCpfCnpjPartial(e.target.value) })} placeholder="00.000.000/0000-00" /></div>
               <div className="space-y-2"><Label>Prazo Médio (dias)</Label><Input type="number" value={editing.avg_delivery_days} onChange={(e) => setEditing({ ...editing, avg_delivery_days: +e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">

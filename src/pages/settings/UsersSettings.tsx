@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Pencil, Loader2, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { trimText } from "@/lib/format";
 
 type UserWithRole = {
   userId: string;
@@ -87,7 +88,7 @@ const UsersSettings = () => {
       body: {
         action: "update",
         user_id: editingUser.userId,
-        display_name: editName,
+        display_name: trimText(editName),
         role: newRole,
       },
       headers: { Authorization: `Bearer ${session?.access_token}` },
@@ -127,9 +128,9 @@ const UsersSettings = () => {
       method: "POST",
       body: {
         action: "create",
-        email: createEmail,
+        email: trimText(createEmail),
         password: createPassword,
-        display_name: createName || createEmail,
+        display_name: trimText(createName) || trimText(createEmail),
         role: createRole,
       },
       headers: { Authorization: `Bearer ${session?.access_token}` },

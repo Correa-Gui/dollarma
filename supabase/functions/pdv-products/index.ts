@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { trimOptionalText, trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!["POST", "PUT", "PATCH"].includes(req.method)) {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -54,8 +55,29 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (req.method === "DELETE") {
+    if (!body.id) {
+      return new Response(JSON.stringify({ error: "id do produto e obrigatorio" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { error } = await supabase.from("products").delete().eq("id", body.id);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method === "POST") {
-    if (!body.name || !body.sku) {
+    if (!trimText(body.name) || !trimText(body.sku)) {
       return new Response(JSON.stringify({ error: "name e sku sao obrigatorios" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,17 +88,21 @@ Deno.serve(async (req) => {
       .from("products")
       .insert({
         id: body.id ?? undefined,
-        name: body.name,
-        sku: body.sku,
-        barcode: body.barcode ?? null,
+        name: trimText(body.name),
+        sku: trimText(body.sku),
+        barcode: trimOptionalText(body.barcode),
+        category_id: trimOptionalText(body.category_id),
+        supplier_id: trimOptionalText(body.supplier_id),
+        ncm: trimOptionalText(body.ncm),
+        cfop: trimOptionalText(body.cfop) ?? "5102",
         sale_price: body.sale_price ?? 0,
         cost_price: body.cost_price ?? body.sale_price ?? 0,
         stock_quantity: body.stock_quantity ?? 0,
         min_stock: body.min_stock ?? 0,
-        unit: body.unit ?? "un",
+        unit: trimText(body.unit ?? "un") || "un",
         is_active: body.is_active ?? true,
       })
-      .select("id, name, sku, barcode, sale_price, cost_price, stock_quantity, min_stock, unit, is_active")
+      .select("id, name, sku, barcode, category_id, supplier_id, ncm, cfop, sale_price, cost_price, stock_quantity, min_stock, unit, is_active")
       .single();
 
     if (error) {
@@ -105,6 +131,13 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    if (typeof value === "string") {
+      updates[key] = key === "barcode" || key === "category_id" || key === "supplier_id" || key === "ncm" || key === "cfop"
+        ? trimOptionalText(value)
+        : (key === "unit" ? trimText(value) || "un" : trimText(value));
+      continue;
+    }
+
     updates[key] = value;
   }
 
@@ -112,7 +145,7 @@ Deno.serve(async (req) => {
     .from("products")
     .update(updates)
     .eq("id", body.id)
-    .select("id, name, sku, barcode, sale_price, cost_price, stock_quantity, min_stock, unit, is_active")
+    .select("id, name, sku, barcode, category_id, supplier_id, ncm, cfop, sale_price, cost_price, stock_quantity, min_stock, unit, is_active")
     .single();
 
   if (error) {

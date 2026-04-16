@@ -344,7 +344,6 @@ export type Database = {
           id: string
           origin: string
           payment_method: string
-          printed_at: string | null
           receipt_requested: boolean | null
           receipt_tax_id: string | null
           sale_number: number
@@ -364,7 +363,6 @@ export type Database = {
           id?: string
           origin?: string
           payment_method?: string
-          printed_at?: string | null
           receipt_requested?: boolean | null
           receipt_tax_id?: string | null
           sale_number?: number
@@ -384,7 +382,6 @@ export type Database = {
           id?: string
           origin?: string
           payment_method?: string
-          printed_at?: string | null
           receipt_requested?: boolean | null
           receipt_tax_id?: string | null
           sale_number?: number

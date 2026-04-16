@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { logAudit } from "./useAuditLog";
+import { trimOptionalText, trimText } from "@/lib/format";
 
 export type Product = Tables<"products"> & {
   categories?: { name: string } | null;
@@ -18,7 +19,13 @@ export function useProducts() {
         .select("*, categories(name), suppliers(name)")
         .order("name");
       if (error) throw error;
-      return data as Product[];
+      return ((data ?? []) as Product[]).map((product) => ({
+        ...product,
+        name: trimText(product.name),
+        sku: trimText(product.sku),
+        barcode: trimOptionalText(product.barcode),
+        unit: trimText(product.unit),
+      }));
     },
   });
 }
@@ -27,7 +34,17 @@ export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (product: TablesInsert<"products">) => {
-      const { data, error } = await supabase.from("products").insert(product).select().single();
+      const { data, error } = await supabase.from("products").insert({
+        ...product,
+        name: trimText(product.name),
+        sku: trimText(product.sku),
+        barcode: trimOptionalText(product.barcode),
+        category_id: trimOptionalText(product.category_id),
+        supplier_id: trimOptionalText(product.supplier_id),
+        ncm: trimOptionalText(product.ncm),
+        cfop: trimOptionalText(product.cfop),
+        unit: trimText(product.unit),
+      }).select().single();
       if (error) throw error;
       return data;
     },
@@ -44,7 +61,17 @@ export function useUpdateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: TablesUpdate<"products"> & { id: string }) => {
-      const { data, error } = await supabase.from("products").update(updates).eq("id", id).select().single();
+      const { data, error } = await supabase.from("products").update({
+        ...updates,
+        name: updates.name ? trimText(updates.name) : updates.name,
+        sku: updates.sku ? trimText(updates.sku) : updates.sku,
+        barcode: updates.barcode === undefined ? undefined : trimOptionalText(updates.barcode),
+        category_id: updates.category_id === undefined ? undefined : trimOptionalText(updates.category_id),
+        supplier_id: updates.supplier_id === undefined ? undefined : trimOptionalText(updates.supplier_id),
+        ncm: updates.ncm === undefined ? undefined : trimOptionalText(updates.ncm),
+        cfop: updates.cfop === undefined ? undefined : trimOptionalText(updates.cfop),
+        unit: updates.unit ? trimText(updates.unit) : updates.unit,
+      }).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },

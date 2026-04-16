@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,18 +72,19 @@ Deno.serve(async (req) => {
     if (action === "create") {
       const { email, password, display_name, role } = body;
 
-      if (!email || !password) {
+      if (!trimText(email) || !password) {
         return new Response(
           JSON.stringify({ error: "email and password are required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (display_name) {
+      const normalizedDisplayName = trimText(display_name);
+      if (normalizedDisplayName) {
         const { data: existing } = await supabaseAdmin
           .from("profiles")
           .select("id")
-          .eq("display_name", display_name)
+          .eq("display_name", normalizedDisplayName)
           .maybeSingle();
 
         if (existing) {
@@ -94,10 +96,10 @@ Deno.serve(async (req) => {
       }
 
       const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: trimText(email),
         password,
         email_confirm: true,
-        user_metadata: { display_name: display_name || email },
+        user_metadata: { display_name: trimText(display_name) || trimText(email) },
       });
 
       if (createErr) {
@@ -131,10 +133,11 @@ Deno.serve(async (req) => {
       }
 
       if (display_name !== undefined) {
+        const normalizedDisplayName = trimText(display_name);
         const { data: existing } = await supabaseAdmin
           .from("profiles")
           .select("id, user_id")
-          .eq("display_name", display_name)
+          .eq("display_name", normalizedDisplayName)
           .maybeSingle();
 
         if (existing && existing.user_id !== user_id) {
@@ -146,7 +149,7 @@ Deno.serve(async (req) => {
 
         await supabaseAdmin
           .from("profiles")
-          .update({ display_name })
+          .update({ display_name: normalizedDisplayName })
           .eq("user_id", user_id);
       }
 

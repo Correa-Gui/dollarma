@@ -9,6 +9,7 @@ import { useSuppliers, useCreateSupplier } from "@/hooks/useSuppliers";
 import { logAudit } from "@/hooks/useAuditLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { matchesLooseSearch } from "@/lib/search";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -26,6 +27,7 @@ import { Plus, Search, Pencil, Trash2, Loader2, ScanLine, X, Sparkles } from "lu
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { trimOptionalText, trimText } from "@/lib/format";
 
 type ProductForm = {
   name: string; sku: string; barcode: string;
@@ -232,10 +234,10 @@ const Products = () => {
   }, [scannerOpen, stopScanner]);
 
   const filtered = products.filter((p) => {
-    const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      (p.barcode ?? "").includes(search);
+    const matchSearch = matchesLooseSearch(
+      `${p.name} ${p.sku} ${p.barcode ?? ""}`,
+      search,
+    );
     const matchCategory =
       filterCategory === "all" || getSubtree(filterCategory).includes(p.category_id ?? "");
     return matchSearch && matchCategory;
@@ -366,7 +368,17 @@ const Products = () => {
     const costPrice = fromInput(editing.cost_price) || salePrice;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { ncm_loading, ...rest } = editing;
-    const payload = { ...rest, cost_price: costPrice, sale_price: salePrice, ncm: rest.ncm || null, cfop: rest.cfop || "5102" };
+    const payload = {
+      ...rest,
+      name: trimText(rest.name),
+      sku: trimText(rest.sku),
+      barcode: trimOptionalText(rest.barcode),
+      unit: trimText(rest.unit),
+      cost_price: costPrice,
+      sale_price: salePrice,
+      ncm: trimOptionalText(rest.ncm),
+      cfop: trimOptionalText(rest.cfop) || "5102",
+    };
     if (editingId) {
       await updateProduct.mutateAsync({ id: editingId, ...payload });
     } else {
@@ -380,10 +392,10 @@ const Products = () => {
   const saveQuickCreate = async () => {
     if (!quickName.trim()) return;
     if (quickCreate === "category") {
-      const created = await createCategory.mutateAsync({ name: quickName.trim() });
+      const created = await createCategory.mutateAsync({ name: trimText(quickName) });
       setEditing((prev) => ({ ...prev, category_id: created.id }));
     } else if (quickCreate === "supplier") {
-      const created = await createSupplier.mutateAsync({ name: quickName.trim() });
+      const created = await createSupplier.mutateAsync({ name: trimText(quickName) });
       setEditing((prev) => ({ ...prev, supplier_id: created.id }));
     }
     setQuickCreate(null);

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { formatCpfCnpjPartial, trimOptionalText, trimText } from "../_shared/format.ts";
+import { trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== "GET") {
+  if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -29,15 +29,14 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Validate terminal token
   const { data: terminal, error: termErr } = await supabase
     .from("pdv_terminals")
-    .select("id, name")
+    .select("id")
     .eq("token", token)
-    .maybeSingle();
+    .single();
 
   if (termErr || !terminal) {
     return new Response(JSON.stringify({ error: "Invalid terminal token" }), {
@@ -46,44 +45,32 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Fetch store settings
-  const { data: settings, error: settErr } = await supabase
-    .from("store_settings")
-    .select("store_name, cnpj, address, timezone, currency, logo_url")
-    .limit(1)
-    .maybeSingle();
+  const body = await req.json().catch(() => null);
+  if (!trimText(body?.name)) {
+    return new Response(JSON.stringify({ error: "name is required" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  if (settErr) {
-    return new Response(JSON.stringify({ error: "Failed to fetch store settings" }), {
+  const { data: category, error } = await supabase
+    .from("categories")
+    .insert({
+      name: trimText(body.name),
+      parent_id: body.parent_id ?? null,
+    })
+    .select("id, name, parent_id, created_at")
+    .single();
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  return new Response(
-    JSON.stringify({
-      terminal: trimText(terminal.name),
-      settings: settings
-        ? {
-            store_name: trimText(settings.store_name),
-            cnpj: settings.cnpj ? formatCpfCnpjPartial(settings.cnpj) : null,
-            address: trimOptionalText(settings.address),
-            timezone: trimText(settings.timezone),
-            currency: trimText(settings.currency),
-            logo_url: trimOptionalText(settings.logo_url),
-          }
-        : {
-            store_name: "Minha Loja",
-            cnpj: null,
-            address: null,
-            timezone: "America/Sao_Paulo",
-            currency: "BRL",
-            logo_url: null,
-          },
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    }
-  );
+  return new Response(JSON.stringify({ category }), {
+    status: 201,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });

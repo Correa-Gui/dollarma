@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildLooseLikePattern } from "../_shared/search.ts";
+import { digitsOnly, formatCpfCnpj, trimOptionalText, trimText } from "../_shared/format.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +23,9 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Validate terminal
   const { data: terminal, error: termErr } = await supabase
     .from("pdv_terminals")
     .select("id")
@@ -38,11 +39,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  // GET — buscar clientes
   if (req.method === "GET") {
     const url = new URL(req.url);
     const search = url.searchParams.get("search") ?? "";
     const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 200);
+    const like = buildLooseLikePattern(search);
 
     let query = supabase
       .from("customers")
@@ -52,12 +53,11 @@ Deno.serve(async (req) => {
 
     if (search.trim()) {
       query = query.or(
-        `name.ilike.%${search}%,cpf.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`
+        `name.ilike.${like},cpf.ilike.${like},phone.ilike.${like},email.ilike.${like}`
       );
     }
 
     const { data, error } = await query;
-
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
@@ -70,19 +70,79 @@ Deno.serve(async (req) => {
     });
   }
 
-  // POST — criar cliente
-  if (req.method === "POST") {
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+  const body = await req.json().catch(() => null);
+  if (!body) {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if ((req.method === "PUT" || req.method === "PATCH") && !body.id) {
+    return new Response(JSON.stringify({ error: "id is required" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (req.method === "DELETE") {
+    if (!body.id) {
+      return new Response(JSON.stringify({ error: "id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const { error } = await supabase.from("customers").delete().eq("id", body.id);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (req.method === "PUT" || req.method === "PATCH") {
+    if (!body.name || !body.name.trim()) {
+      return new Response(JSON.stringify({ error: "name is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: customer, error } = await supabase
+      .from("customers")
+      .update({
+        name: trimText(body.name),
+        cpf: formatCpfCnpj(body.cpf),
+        phone: trimOptionalText(body.phone),
+        email: trimOptionalText(body.email),
+        address: trimOptionalText(body.address),
+        notes: trimOptionalText(body.notes),
+      })
+      .eq("id", body.id)
+      .select("id, name, cpf, phone, email, address, notes, created_at")
+      .single();
+
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ customer }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (req.method === "POST") {
     const { name, cpf, phone, email, address, notes } = body;
+    const normalizedCpf = formatCpfCnpj(cpf);
 
     if (!name || !name.trim()) {
       return new Response(JSON.stringify({ error: "name is required" }), {
@@ -91,12 +151,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verifica duplicata por CPF (se informado)
-    if (cpf) {
+    if (normalizedCpf) {
       const { data: existing } = await supabase
         .from("customers")
         .select("id, name")
-        .eq("cpf", cpf)
+        .eq("cpf", normalizedCpf)
         .maybeSingle();
 
       if (existing) {
@@ -109,7 +168,14 @@ Deno.serve(async (req) => {
 
     const { data: customer, error } = await supabase
       .from("customers")
-      .insert({ name: name.trim(), cpf: cpf ?? null, phone: phone ?? null, email: email ?? null, address: address ?? null, notes: notes ?? null })
+      .insert({
+        name: trimText(name),
+        cpf: normalizedCpf,
+        phone: trimOptionalText(phone),
+        email: trimOptionalText(email),
+        address: trimOptionalText(address),
+        notes: trimOptionalText(notes),
+      })
       .select("id, name, cpf, phone, email, address, notes, created_at")
       .single();
 

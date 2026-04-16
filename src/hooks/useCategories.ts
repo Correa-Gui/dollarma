@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { logAudit } from "./useAuditLog";
+import { trimText } from "@/lib/format";
 
 export type Category = Tables<"categories"> & {
   parent?: { name: string } | null;
@@ -28,9 +29,11 @@ export function useCategories() {
         if (p.category_id) countMap[p.category_id] = (countMap[p.category_id] || 0) + 1;
       });
 
-      const catMap = new Map(cats.map((c) => [c.id, c]));
-      return cats.map((c) => ({
+      const catsList = cats ?? [];
+      const catMap = new Map(catsList.map((c) => [c.id, c]));
+      return catsList.map((c) => ({
         ...c,
+        name: trimText(c.name),
         parent: c.parent_id ? { name: catMap.get(c.parent_id)?.name ?? "" } : null,
         product_count: countMap[c.id] ?? 0,
       })) as Category[];
@@ -42,7 +45,10 @@ export function useCreateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cat: TablesInsert<"categories">) => {
-      const { data, error } = await supabase.from("categories").insert(cat).select().single();
+      const { data, error } = await supabase.from("categories").insert({
+        ...cat,
+        name: trimText(cat.name),
+      }).select().single();
       if (error) throw error;
       return data;
     },
@@ -59,7 +65,10 @@ export function useUpdateCategory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: TablesUpdate<"categories"> & { id: string }) => {
-      const { data, error } = await supabase.from("categories").update(updates).eq("id", id).select().single();
+      const { data, error } = await supabase.from("categories").update({
+        ...updates,
+        name: updates.name ? trimText(updates.name) : updates.name,
+      }).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },

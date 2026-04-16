@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Printer } from "lucide-react";
+import { formatCpfCnpjPartial } from "@/lib/format";
 
 const paymentLabels: Record<string, string> = {
   dinheiro: "Dinheiro",
@@ -83,7 +84,7 @@ const FiscalReport = () => {
             </div>
             {settings?.cnpj && (
               <div className="text-sm text-muted-foreground print:text-black">
-                CNPJ: {settings.cnpj}
+                CNPJ: {formatCpfCnpjPartial(settings.cnpj)}
               </div>
             )}
           </div>
@@ -116,7 +117,7 @@ const FiscalReport = () => {
                       {sale.customers ? (
                         <span>
                           {sale.customers.name}
-                          {sale.customers.cpf && ` · CPF: ${sale.customers.cpf}`}
+                          {sale.customers.cpf && ` · CPF/CNPJ: ${formatCpfCnpjPartial(sale.customers.cpf)}`}
                         </span>
                       ) : (
                         <span className="text-muted-foreground print:text-gray-500">CONSUMIDOR - A VISTA</span>

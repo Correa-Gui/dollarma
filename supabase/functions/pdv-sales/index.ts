@@ -158,6 +158,16 @@ Deno.serve(async (req) => {
   const discountAmount = +((subtotal * parsedDiscountPercent) / 100).toFixed(2);
   const total = +(subtotal - discountAmount).toFixed(2);
 
+  let safeCustomerId: string | null = null;
+  if (customer_id) {
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", customer_id)
+      .maybeSingle();
+    safeCustomerId = customer?.id ?? null;
+  }
+
   const { data: sale, error: saleErr } = await supabase
     .from("sales")
     .insert({
@@ -172,7 +182,7 @@ Deno.serve(async (req) => {
       discount_amount: discountAmount,
       receipt_requested: Boolean(receipt_requested),
       receipt_tax_id: receipt_tax_id ?? null,
-      ...(customer_id ? { customer_id } : {}),
+      ...(safeCustomerId ? { customer_id: safeCustomerId } : {}),
     })
     .select("id, sale_number")
     .single();
