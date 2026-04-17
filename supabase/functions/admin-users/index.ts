@@ -109,11 +109,10 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (role && role !== "cashier" && newUser.user) {
+      if (role && newUser.user) {
         await supabaseAdmin
           .from("user_roles")
-          .update({ role })
-          .eq("user_id", newUser.user.id);
+          .upsert({ user_id: newUser.user.id, role }, { onConflict: "user_id" });
       }
 
       return new Response(
@@ -156,8 +155,7 @@ Deno.serve(async (req) => {
       if (role) {
         await supabaseAdmin
           .from("user_roles")
-          .update({ role })
-          .eq("user_id", user_id);
+          .upsert({ user_id, role }, { onConflict: "user_id" });
       }
 
       return new Response(
