@@ -6,15 +6,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip as RechartsTooltip, ResponsiveContainer, Legend, Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
 } from "recharts";
+import { getPaymentBucketKey, getPaymentLabel } from "@/lib/payment";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const COLORS = [
-  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))", "hsl(var(--chart-5))",
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
 ];
 
 function useTicketByPayment() {
@@ -32,21 +42,20 @@ function useTicketByPayment() {
 
       const methods: Record<string, { total: number; count: number }> = {};
       data?.forEach((s) => {
-        if (!methods[s.payment_method]) methods[s.payment_method] = { total: 0, count: 0 };
-        methods[s.payment_method].total += Number(s.total);
-        methods[s.payment_method].count++;
+        const key = getPaymentBucketKey(s.payment_method);
+        if (!methods[key]) methods[key] = { total: 0, count: 0 };
+        methods[key].total += Number(s.total);
+        methods[key].count++;
       });
 
-      const rows = Object.entries(methods)
+      return Object.entries(methods)
         .map(([method, v]) => ({
-          method,
+          method: getPaymentLabel(method),
           avgTicket: v.count > 0 ? +(v.total / v.count).toFixed(2) : 0,
           totalRevenue: v.total,
           salesCount: v.count,
         }))
         .sort((a, b) => b.avgTicket - a.avgTicket);
-
-      return rows;
     },
   });
 }
@@ -59,7 +68,10 @@ const TicketByPayment = () => {
     const header = "Forma de Pagamento,Ticket Médio,Faturamento,Qtd Vendas\n";
     const rows = data.map((r) => `${r.method},${r.avgTicket},${r.totalRevenue.toFixed(2)},${r.salesCount}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ticket-por-pagamento.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ticket-por-pagamento.csv";
+    a.click();
     toast.success("CSV exportado");
   };
 
@@ -78,7 +90,6 @@ const TicketByPayment = () => {
         <Button variant="outline" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> Exportar CSV</Button>
       </div>
 
-      {/* Insight cards */}
       {highest && lowest && highest.method !== lowest.method && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="border-chart-2/30 bg-chart-2/5">
@@ -98,7 +109,6 @@ const TicketByPayment = () => {
         </div>
       )}
 
-      {/* Chart */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Comparativo de Ticket Médio</CardTitle></CardHeader>
         <CardContent>
@@ -107,15 +117,13 @@ const TicketByPayment = () => {
               <BarChart data={data ?? []} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => fmt(v)} />
-                <YAxis type="category" dataKey="method" tick={{ fontSize: 12 }} width={100} />
+                <YAxis type="category" dataKey="method" tick={{ fontSize: 12 }} width={130} />
                 <RechartsTooltip
                   formatter={(v: number, name: string) => [fmt(v), name]}
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)", fontSize: 12 }}
                 />
                 <Bar dataKey="avgTicket" name="Ticket Médio" radius={[0, 4, 4, 0]}>
-                  {data?.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
+                  {data?.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -123,7 +131,6 @@ const TicketByPayment = () => {
         </CardContent>
       </Card>
 
-      {/* Table */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Detalhamento</CardTitle></CardHeader>
         <CardContent>
@@ -139,7 +146,7 @@ const TicketByPayment = () => {
             <TableBody>
               {data?.map((r) => (
                 <TableRow key={r.method}>
-                  <TableCell className="font-medium capitalize">{r.method}</TableCell>
+                  <TableCell className="font-medium">{r.method}</TableCell>
                   <TableCell className="text-right">{fmt(r.avgTicket)}</TableCell>
                   <TableCell className="text-right">{fmt(r.totalRevenue)}</TableCell>
                   <TableCell className="text-right">{r.salesCount}</TableCell>

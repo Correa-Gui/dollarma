@@ -1,9 +1,15 @@
 import { usePosicaoFinanceira } from "@/hooks/usePosicaoFinanceira";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
+import { getPaymentLabel } from "@/lib/payment";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -13,19 +19,8 @@ const fmtDate = (iso: string) =>
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
-const paymentLabels: Record<string, string> = {
-  dinheiro: "Dinheiro",
-  cartao_credito: "Cartão Crédito",
-  cartao_debito: "Cartão Débito",
-  pix: "PIX",
-  boleto: "Boleto",
-  cheque: "Cheque",
-  crediario: "Crediário",
-};
-
 const PosicaoFinanceira = () => {
   const { data, isLoading } = usePosicaoFinanceira();
-
   const dateLabel = new Date().toLocaleDateString("pt-BR", { dateStyle: "full" });
 
   return (
@@ -48,25 +43,19 @@ const PosicaoFinanceira = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Vendas do Mês</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{fmt(data.vendasMes)}</p>
-              </CardContent>
+              <CardContent><p className="text-2xl font-bold">{fmt(data.vendasMes)}</p></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">A Pagar (pendente)</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-amber-600">{fmt(data.pendentes)}</p>
-              </CardContent>
+              <CardContent><p className="text-2xl font-bold text-amber-600">{fmt(data.pendentes)}</p></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Contas Vencidas</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-destructive">{fmt(data.vencidas)}</p>
-              </CardContent>
+              <CardContent><p className="text-2xl font-bold text-destructive">{fmt(data.vencidas)}</p></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
@@ -131,8 +120,8 @@ const PosicaoFinanceira = () => {
                     <TableRow key={sale.id}>
                       <TableCell className="font-mono text-xs">{sale.sale_number}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{fmtDateTime(sale.sold_at)}</TableCell>
-                      <TableCell className="text-sm">{sale.customers?.name ?? "—"}</TableCell>
-                      <TableCell className="text-sm">{paymentLabels[sale.payment_method] ?? sale.payment_method}</TableCell>
+                      <TableCell className="text-sm">{sale.customers?.name ?? sale.customer_name ?? "—"}</TableCell>
+                      <TableCell className="text-sm">{getPaymentLabel(sale.payment_method)}</TableCell>
                       <TableCell className="text-right font-medium">{fmt(Number(sale.total))}</TableCell>
                     </TableRow>
                   ))}

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getPaymentLabel, getPaymentBucketKey } from "@/lib/payment";
 
 export function useDashboardKpis() {
   return useQuery({
@@ -128,7 +129,8 @@ export function usePaymentMethodBreakdown() {
       let grand = 0;
       data?.forEach((s) => {
         const t = Number(s.total);
-        totals[s.payment_method] = (totals[s.payment_method] || 0) + t;
+        const key = getPaymentBucketKey(s.payment_method);
+        totals[key] = (totals[key] || 0) + t;
         grand += t;
       });
 
@@ -140,7 +142,7 @@ export function usePaymentMethodBreakdown() {
       return Object.entries(totals)
         .sort((a, b) => b[1] - a[1])
         .map(([name, value], i) => ({
-          name,
+          name: getPaymentLabel(name),
           value: grand > 0 ? Math.round((value / grand) * 100) : 0,
           color: colors[i % colors.length],
         }));

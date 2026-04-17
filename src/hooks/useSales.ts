@@ -9,6 +9,7 @@ export type Sale = Tables<"sales"> & {
   sale_items?: SaleItem[];
   pdv_terminals?: { name: string } | null;
   customers?: { name: string } | null;
+  customer_name?: string | null;
 };
 
 export function useSales() {
@@ -18,7 +19,7 @@ export function useSales() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("sales")
-        .select("*, discount_percent, discount_amount, receipt_requested, receipt_tax_id, sale_items(*), pdv_terminals(name), customers(name)")
+        .select("*, discount_percent, discount_amount, receipt_requested, receipt_tax_id, customer_name, sale_items(*), pdv_terminals(name), customers(name)")
         .order("sold_at", { ascending: false });
       if (error) throw error;
       return data as Sale[];

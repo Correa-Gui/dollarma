@@ -29,6 +29,7 @@ import AbcCurve from "./pages/reports/AbcCurve";
 import TicketByPayment from "./pages/reports/TicketByPayment";
 import StockTurnover from "./pages/reports/StockTurnover";
 import FiscalReport from "./pages/reports/FiscalReport";
+import CashRegisterConsolidatedReport from "./pages/reports/CashRegisterConsolidatedReport";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import PdvSettings from "./pages/settings/PdvSettings";
 import UsersSettings from "./pages/settings/UsersSettings";
@@ -96,6 +97,7 @@ const App = () => (
                 <Route path="/financeiro/posicao-financeira" element={<PosicaoFinanceira />} />
                 <Route path="/relatorios/historico-precos" element={<PriceHistory />} />
               </Route>
+              <Route path="/relatorios/caixa/consolidado" element={<ProtectedRoute><CashRegisterConsolidatedReport /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

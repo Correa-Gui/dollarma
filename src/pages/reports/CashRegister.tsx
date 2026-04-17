@@ -1,18 +1,17 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell,
-} from "recharts";
-import { Download, Loader2, Eye, Wallet, ArrowDownCircle, ArrowUpCircle, DollarSign, ShoppingCart } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
+import { Download, Loader2, Eye, Wallet, ArrowDownCircle, ArrowUpCircle, DollarSign, ShoppingCart, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useTerminals } from "@/hooks/useTerminals";
 import { useCashRegisterSessions, type CashSession } from "@/hooks/useCashRegister";
+import { getPaymentLabel } from "@/lib/payment";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -27,23 +26,47 @@ const typeColors: Record<string, string> = {
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 
+type TimelineRow =
+  | {
+      id: string;
+      type: "sale";
+      amount: number;
+      payment: string;
+      time: Date;
+      sale: CashSession["sales"][number];
+    }
+  | {
+      id: string;
+      type: "withdrawal" | "deposit" | "refund";
+      amount: number;
+      payment: string;
+      time: Date;
+      description: string | null;
+    };
+
 function getSessionSalesTotal(session: CashSession) {
   return (session.sales ?? [])
     .filter((s) => s.status === "completed")
     .reduce((sum, s) => sum + Number(s.total), 0);
 }
 
-function buildTimeline(session: CashSession) {
-  const rows: { id: string; type: string; amount: number; payment: string; description: string; time: Date }[] = [];
+function getSessionWithdrawalsTotal(session: CashSession) {
+  return (session.cash_register_movements ?? [])
+    .filter((m) => m.type === "withdrawal")
+    .reduce((sum, m) => sum + Number(m.amount), 0);
+}
+
+function buildTimeline(session: CashSession): TimelineRow[] {
+  const rows: TimelineRow[] = [];
 
   (session.sales ?? []).forEach((s) => {
     rows.push({
       id: s.id,
       type: "sale",
       amount: Number(s.total),
-      payment: s.payment_method,
-      description: `Venda #${s.sale_number}`,
+      payment: getPaymentLabel(s.payment_method),
       time: new Date(s.sold_at),
+      sale: s,
     });
   });
 
@@ -52,8 +75,8 @@ function buildTimeline(session: CashSession) {
       id: m.id,
       type: m.type,
       amount: Number(m.amount),
-      payment: m.type === "withdrawal" ? "Dinheiro" : (m.payment_method ?? "—"),
-      description: m.description ?? "—",
+      payment: m.type === "withdrawal" ? "Dinheiro" : getPaymentLabel(m.payment_method),
+      description: m.description ?? null,
       time: new Date(m.created_at),
     });
   });
@@ -68,19 +91,19 @@ const CashRegister = () => {
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedMovement, setSelectedMovement] = useState<TimelineRow | null>(null);
 
   const { data: terminals = [], isLoading: loadingTerminals } = useTerminals();
   const { data: sessions = [], isLoading: loadingSessions } = useCashRegisterSessions(
     terminalId === "all" ? undefined : terminalId,
     dateFrom,
-    dateTo
+    dateTo,
   );
 
   const terminalMap = useMemo(() => Object.fromEntries(terminals.map((t) => [t.id, t.name])), [terminals]);
-
   const selectedSession = useMemo(() => sessions.find((s) => s.id === selectedSessionId), [sessions, selectedSessionId]);
+  const timeline = useMemo(() => (selectedSession ? buildTimeline(selectedSession) : []), [selectedSession]);
 
-  // KPIs
   const kpis = useMemo(() => {
     let openCount = 0, closedCount = 0, totalOpening = 0, totalClosing = 0, totalDiff = 0, totalSales = 0;
     sessions.forEach((s) => {
@@ -95,12 +118,13 @@ const CashRegister = () => {
     return { openCount, closedCount, totalOpening, totalClosing, totalDiff, totalSales, total: sessions.length };
   }, [sessions]);
 
-  // Chart: sessions per terminal
   const chartData = useMemo(() => {
     const map: Record<string, { terminal: string; sessions: number; opening: number; closing: number; vendas: number }> = {};
     sessions.forEach((s) => {
       const name = terminalMap[s.terminal_id] ?? "Desconhecido";
-      if (!map[s.terminal_id]) map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, closing: 0, vendas: 0 };
+      if (!map[s.terminal_id]) {
+        map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, closing: 0, vendas: 0 };
+      }
       map[s.terminal_id].sessions++;
       map[s.terminal_id].opening += Number(s.opening_balance ?? 0);
       map[s.terminal_id].closing += Number(s.closing_balance ?? 0);
@@ -109,14 +133,10 @@ const CashRegister = () => {
     return Object.values(map);
   }, [sessions, terminalMap]);
 
-  // Pie: status
   const statusPie = useMemo(() => [
     { name: "Abertos", value: kpis.openCount },
     { name: "Fechados", value: kpis.closedCount },
   ].filter((d) => d.value > 0), [kpis]);
-
-  // Timeline for selected session
-  const timeline = useMemo(() => selectedSession ? buildTimeline(selectedSession) : [], [selectedSession]);
 
   const timelineSummary = useMemo(() => {
     const map: Record<string, number> = {};
@@ -129,20 +149,33 @@ const CashRegister = () => {
   const exportCSV = () => {
     const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Total Vendas,Saldo Final,Diferença,Status\n";
     const rows = sessions.map((s) =>
-      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${getSessionSalesTotal(s)},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`
+      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${getSessionSalesTotal(s)},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`,
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "caixa-diario.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "caixa-diario.csv";
+    a.click();
     toast.success("CSV exportado");
+  };
+
+  const openConsolidatedReport = () => {
+    const params = new URLSearchParams({
+      terminalId,
+      dateFrom,
+      dateTo,
+    });
+    window.open(`/relatorios/caixa/consolidado?${params.toString()}`, "_blank", "noopener,noreferrer");
   };
 
   const isLoading = loadingTerminals || loadingSessions;
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Caixa Diário</h1>
@@ -150,23 +183,19 @@ const CashRegister = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={terminalId} onValueChange={setTerminalId}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Terminal" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Terminal" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os terminais</SelectItem>
-              {terminals.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
+              {terminals.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" />
           <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" />
           <Button variant="outline" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+          <Button variant="outline" onClick={openConsolidatedReport}><FileText className="h-4 w-4 mr-1" /> Relatório</Button>
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
@@ -202,7 +231,6 @@ const CashRegister = () => {
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid md:grid-cols-2 gap-4">
         {chartData.length > 0 && (
           <Card>
@@ -244,7 +272,6 @@ const CashRegister = () => {
         )}
       </div>
 
-      {/* Table */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -266,10 +293,7 @@ const CashRegister = () => {
               <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
             ) : sessions.map((s) => {
               const salesTotal = getSessionSalesTotal(s);
-              const withdrawalsTotal = (s.cash_register_movements ?? [])
-                .filter((m) => m.type === "withdrawal")
-                .reduce((sum, m) => sum + Number(m.amount), 0);
-
+              const withdrawalsTotal = getSessionWithdrawalsTotal(s);
               return (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{terminalMap[s.terminal_id] ?? "—"}</TableCell>
@@ -299,11 +323,13 @@ const CashRegister = () => {
         </Table>
       </div>
 
-      {/* Detail Dialog */}
       <Dialog open={!!selectedSessionId} onOpenChange={(o) => !o && setSelectedSessionId(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Movimentações da Sessão</DialogTitle>
+            <DialogDescription>
+              {selectedSession ? `${terminalMap[selectedSession.terminal_id] ?? "Terminal"} · ${fmtDate(selectedSession.opened_at)}` : ""}
+            </DialogDescription>
           </DialogHeader>
           {selectedSession && (
             <>
@@ -324,7 +350,7 @@ const CashRegister = () => {
                       <TableHead className="uppercase text-xs">Tipo</TableHead>
                       <TableHead className="uppercase text-xs text-right">Valor</TableHead>
                       <TableHead className="uppercase text-xs">Pagamento</TableHead>
-                      <TableHead className="uppercase text-xs">Descrição</TableHead>
+                      <TableHead className="uppercase text-xs">Detalhes</TableHead>
                       <TableHead className="uppercase text-xs">Hora</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -342,7 +368,17 @@ const CashRegister = () => {
                           {r.type === "withdrawal" ? "- " : ""}{fmt(r.amount)}
                         </TableCell>
                         <TableCell className="text-sm">{r.payment}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{r.description}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-2 px-2 text-sm"
+                            onClick={() => setSelectedMovement(r)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver detalhes
+                          </Button>
+                        </TableCell>
                         <TableCell className="text-sm tabular-nums">{r.time.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                       </TableRow>
                     ))}
@@ -350,6 +386,62 @@ const CashRegister = () => {
                 </Table>
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedMovement} onOpenChange={(o) => !o && setSelectedMovement(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedMovement?.type === "sale" ? `Venda #${selectedMovement.sale.sale_number}` : typeLabels[selectedMovement?.type ?? ""] ?? "Movimentação"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedMovement ? `${fmtDate(selectedMovement.time.toISOString())} · ${selectedMovement.payment}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMovement && selectedMovement.type === "sale" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-lg border p-3"><p className="text-muted-foreground">Valor da venda</p><p className="text-base font-semibold">{fmt(Number(selectedMovement.sale.total))}</p></div>
+                <div className="rounded-lg border p-3"><p className="text-muted-foreground">Desconto</p><p className="text-base font-semibold text-amber-700">{fmt(Number(selectedMovement.sale.discount_amount ?? 0))}</p></div>
+                <div className="rounded-lg border p-3 bg-primary/5"><p className="text-muted-foreground">Cliente</p><p className="text-base font-semibold">{selectedMovement.sale.customers?.name ?? selectedMovement.sale.customer_name ?? "Consumidor final"}</p></div>
+              </div>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="text-right">Qtd</TableHead>
+                      <TableHead className="text-right">Unit.</TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedMovement.sale.sale_items?.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="text-sm">{item.product_name}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">{fmt(Number(item.unit_price))}</TableCell>
+                        <TableCell className="text-right font-medium">{fmt(Number(item.subtotal))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          {selectedMovement && selectedMovement.type !== "sale" && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3"><p className="text-muted-foreground">Tipo</p><p className="font-semibold">{typeLabels[selectedMovement.type]}</p></div>
+                <div className="rounded-lg border p-3"><p className="text-muted-foreground">Valor</p><p className={`font-semibold ${selectedMovement.type === "withdrawal" ? "text-red-600" : ""}`}>{selectedMovement.type === "withdrawal" ? "- " : ""}{fmt(selectedMovement.amount)}</p></div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-muted-foreground">Descrição</p>
+                <p className="font-medium">{selectedMovement.description ?? "—"}</p>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

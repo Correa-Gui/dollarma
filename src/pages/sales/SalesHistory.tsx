@@ -1,19 +1,38 @@
 import { useState } from "react";
 import { useSales, useCancelSale, type Sale } from "@/hooks/useSales";
 import { useCustomers, useLinkCustomerToSale } from "@/hooks/useCustomers";
+import { getPaymentLabel, normalizePaymentMethod } from "@/lib/payment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,25 +46,6 @@ const statusColor: Record<string, string> = {
   refunded: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200 dark:border-amber-800",
 };
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const paymentLabel = (value: string) => {
-  switch ((value ?? "").toLowerCase()) {
-    case "cash":
-    case "dinheiro":
-      return "Dinheiro";
-    case "pix":
-      return "Pix";
-    case "credit_card":
-    case "credito":
-    case "crédito":
-      return "Crédito";
-    case "debit_card":
-    case "debito":
-    case "débito":
-      return "Débito";
-    default:
-      return value;
-  }
-};
 
 const getItemsSubtotal = (sale: Sale) =>
   (sale.sale_items ?? []).reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0);
@@ -56,8 +56,7 @@ const getEffectiveDiscountAmount = (sale: Sale) => {
     return explicitDiscount;
   }
 
-  const inferredDiscount = Math.max(getItemsSubtotal(sale) - Number(sale.total ?? 0), 0);
-  return Number(inferredDiscount.toFixed(2));
+  return Math.max(getItemsSubtotal(sale) - Number(sale.total ?? 0), 0);
 };
 
 const getEffectiveDiscountPercent = (sale: Sale) => {
@@ -89,16 +88,14 @@ const SalesHistory = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [linkingCustomer, setLinkingCustomer] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
-  const selectedDiscountAmount = detailSale ? getEffectiveDiscountAmount(detailSale) : 0;
-  const selectedDiscountPercent = detailSale ? getEffectiveDiscountPercent(detailSale) : 0;
 
   const filtered = sales.filter((s) => {
     const matchSearch =
       String(s.sale_number).includes(search) ||
       (s.pdv_terminals?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (s.customers?.name ?? "").toLowerCase().includes(search.toLowerCase());
+      (s.customers?.name ?? s.customer_name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || s.status === filterStatus;
-    const matchPayment = filterPayment === "all" || paymentLabel(s.payment_method) === filterPayment;
+    const matchPayment = filterPayment === "all" || normalizePaymentMethod(s.payment_method) === filterPayment;
     return matchSearch && matchStatus && matchPayment;
   });
 
@@ -125,12 +122,15 @@ const SalesHistory = () => {
   };
 
   const exportCSV = () => {
-    const header = "Nº,Data,Terminal,Cliente,Pagamento,Total,Status\n";
+    const header = "Nº,Data,Terminal,Cliente,Pagamento,Valor da venda,Desconto,Total,Status\n";
     const rows = filtered.map((s) =>
-        `${s.sale_number},${new Date(s.sold_at).toLocaleString("pt-BR")},${s.pdv_terminals?.name ?? s.origin},${s.customers?.name ?? ""},${paymentLabel(s.payment_method)},${s.total},${statusLabel[s.status] ?? s.status}`
+      `${s.sale_number},${new Date(s.sold_at).toLocaleString("pt-BR")},${s.pdv_terminals?.name ?? s.origin},${s.customers?.name ?? s.customer_name ?? ""},${getPaymentLabel(s.payment_method)},${getItemsSubtotal(s)},${getEffectiveDiscountAmount(s)},${s.total},${statusLabel[s.status] ?? s.status}`,
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "vendas.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "vendas.csv";
+    a.click();
     toast.success("CSV exportado");
   };
 
@@ -163,13 +163,13 @@ const SalesHistory = () => {
           </SelectContent>
         </Select>
         <Select value={filterPayment} onValueChange={setFilterPayment}>
-          <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Pagamento" /></SelectTrigger>
+          <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Pagamento" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Pix">Pix</SelectItem>
-            <SelectItem value="Crédito">Crédito</SelectItem>
-            <SelectItem value="Débito">Débito</SelectItem>
-            <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+            <SelectItem value="cash">Dinheiro</SelectItem>
+            <SelectItem value="pix">PIX</SelectItem>
+            <SelectItem value="credit_card">Cartão de crédito</SelectItem>
+            <SelectItem value="debit_card">Cartão de débito</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -184,7 +184,8 @@ const SalesHistory = () => {
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Cliente</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider text-center">Itens</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Pagamento</TableHead>
-              <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Desconto</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Valor da venda</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Desconto (R$)</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Total</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider w-[90px]">Ações</TableHead>
@@ -196,13 +197,12 @@ const SalesHistory = () => {
                 <TableCell className="font-mono text-xs font-medium">#{s.sale_number}</TableCell>
                 <TableCell className="text-xs tabular-nums">{new Date(s.sold_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{s.pdv_terminals?.name ?? s.origin}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{s.customers?.name ?? "—"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{s.customers?.name ?? s.customer_name ?? "—"}</TableCell>
                 <TableCell className="text-center text-sm tabular-nums">{s.sale_items?.length ?? 0}</TableCell>
-                <TableCell className="text-sm">{paymentLabel(s.payment_method)}</TableCell>
+                <TableCell className="text-sm">{getPaymentLabel(s.payment_method)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{fmt(getItemsSubtotal(s))}</TableCell>
                 <TableCell className="text-right text-sm tabular-nums">
-                  {getEffectiveDiscountAmount(s) > 0
-                    ? `${fmt(getEffectiveDiscountAmount(s))}${getEffectiveDiscountPercent(s) > 0 ? ` (${getEffectiveDiscountPercent(s).toFixed(2)}%)` : ""}`
-                    : "—"}
+                  {getEffectiveDiscountAmount(s) > 0 ? fmt(getEffectiveDiscountAmount(s)) : "—"}
                 </TableCell>
                 <TableCell className="text-right font-semibold text-sm tabular-nums">{fmt(Number(s.total))}</TableCell>
                 <TableCell>
@@ -222,14 +222,13 @@ const SalesHistory = () => {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada</TableCell>
+                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">Nenhuma venda encontrada</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Detail Sheet */}
       <Sheet open={!!detailSale} onOpenChange={() => { setDetailSale(null); setLinkingCustomer(false); }}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>
@@ -240,7 +239,6 @@ const SalesHistory = () => {
           </SheetHeader>
           {detailSale && (
             <div className="mt-6 space-y-4">
-              {/* Seção Cliente */}
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium flex items-center gap-1.5">
@@ -248,7 +246,7 @@ const SalesHistory = () => {
                   </span>
                   <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={openLinkCustomer}>
                     <Pencil className="h-3 w-3" />
-                    {detailSale.customers?.name ? "Alterar" : "Vincular"}
+                    {detailSale.customers?.name || detailSale.customer_name ? "Alterar" : "Vincular"}
                   </Button>
                 </div>
                 {linkingCustomer ? (
@@ -266,30 +264,25 @@ const SalesHistory = () => {
                     <Button size="sm" variant="ghost" className="h-8" onClick={() => setLinkingCustomer(false)}>✕</Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">{detailSale.customers?.name ?? "Nenhum cliente vinculado"}</p>
+                  <p className="text-sm text-muted-foreground">{detailSale.customers?.name ?? detailSale.customer_name ?? "Nenhum cliente vinculado"}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-muted-foreground">Origem</p><p className="font-medium">{detailSale.origin}</p></div>
-                <div><p className="text-muted-foreground">Pagamento</p><p className="font-medium">{paymentLabel(detailSale.payment_method)}</p></div>
+                <div><p className="text-muted-foreground">Pagamento</p><p className="font-medium">{getPaymentLabel(detailSale.payment_method)}</p></div>
                 <div>
                   <p className="text-muted-foreground">Status</p>
                   <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${statusColor[detailSale.status] ?? "bg-muted text-muted-foreground border-border"}`}>
                     {statusLabel[detailSale.status] ?? detailSale.status}
                   </span>
                 </div>
+                <div><p className="text-muted-foreground">Valor da venda</p><p className="font-medium">{fmt(getItemsSubtotal(detailSale))}</p></div>
+                {getEffectiveDiscountAmount(detailSale) > 0 && (
+                  <div><p className="text-muted-foreground">Desconto</p><p className="font-medium text-amber-700">{fmt(getEffectiveDiscountAmount(detailSale))}</p></div>
+                )}
+                <div><p className="text-muted-foreground">Valor final</p><p className="font-medium">{fmt(Number(detailSale.total))}</p></div>
               </div>
-
-              {selectedDiscountAmount > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-                  <p className="text-muted-foreground">Desconto aplicado</p>
-                  <p className="font-semibold text-amber-700">
-                    {fmt(selectedDiscountAmount)}
-                    {selectedDiscountPercent > 0 ? ` (${selectedDiscountPercent.toFixed(2)}%)` : ""}
-                  </p>
-                </div>
-              )}
 
               {detailSale.cancel_reason && (
                 <div className="rounded-lg bg-destructive/10 p-3 text-sm">
@@ -323,20 +316,11 @@ const SalesHistory = () => {
                   </Table>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                {selectedDiscountAmount > 0 && (
-                  <p className="text-sm text-amber-700 font-medium">
-                    Desconto informado na venda: {fmt(selectedDiscountAmount)}
-                  </p>
-                )}
-                <div className="text-lg font-bold">Total: {fmt(Number(detailSale.total))}</div>
-              </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>

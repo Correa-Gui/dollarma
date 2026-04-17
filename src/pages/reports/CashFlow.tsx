@@ -2,38 +2,37 @@ import { useSales } from "@/hooks/useSales";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getPaymentBucketKey, getPaymentLabel } from "@/lib/payment";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+type PaymentBucketKey = "pix" | "credit_card" | "debit_card" | "cash" | "other";
 
 const CashFlow = () => {
   const { data: sales = [], isLoading } = useSales();
 
-  // Build cash flow from real sales
   const now = new Date();
-  const buckets: Record<string, { pix: number; credit: number; debit: number; cash: number; total: number }> = {};
+  const buckets: Record<string, Record<PaymentBucketKey | "total", number>> = {};
   for (let i = 0; i < 30; i++) {
-    const d = new Date(now); d.setDate(d.getDate() - 29 + i);
+    const d = new Date(now);
+    d.setDate(d.getDate() - 29 + i);
     const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-    buckets[key] = { pix: 0, credit: 0, debit: 0, cash: 0, total: 0 };
+    buckets[key] = { pix: 0, credit_card: 0, debit_card: 0, cash: 0, other: 0, total: 0 };
   }
-
-  const pmMap: Record<string, keyof typeof buckets[string]> = {
-    "Pix": "pix", "pix": "pix", "Crédito": "credit", "credito": "credit",
-    "Débito": "debit", "debito": "debit", "Dinheiro": "cash", "dinheiro": "cash",
-  };
 
   sales.filter((s) => s.status === "completed").forEach((s) => {
     const d = new Date(s.sold_at);
     const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
     if (!buckets[key]) return;
     const total = Number(s.total);
-    const field = pmMap[s.payment_method] ?? "cash";
-    (buckets[key] as any)[field] += total;
+    const candidate = getPaymentBucketKey(s.payment_method);
+    const field: PaymentBucketKey =
+      candidate === "pix" || candidate === "credit_card" || candidate === "debit_card" || candidate === "cash"
+        ? candidate
+        : "other";
+    buckets[key][field] += total;
     buckets[key].total += total;
   });
 
@@ -46,10 +45,13 @@ const CashFlow = () => {
   const lastDay = cashFlowData[cashFlowData.length - 1];
 
   const exportCSV = () => {
-    const header = "Data,Pix,Crédito,Débito,Dinheiro,Total,Acumulado\n";
-    const rows = cashFlowData.map((d) => `${d.date},${d.pix},${d.credit},${d.debit},${d.cash},${d.total},${d.accumulated}`).join("\n");
+    const header = "Data,PIX,Cartão de Crédito,Cartão de Débito,Dinheiro,Outros,Total,Acumulado\n";
+    const rows = cashFlowData.map((d) => `${d.date},${d.pix},${d.credit_card},${d.debit_card},${d.cash},${d.other},${d.total},${d.accumulated}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "fluxo-de-caixa.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "fluxo-de-caixa.csv";
+    a.click();
     toast.success("CSV exportado");
   };
 
@@ -98,11 +100,11 @@ const CashFlow = () => {
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
-                <Legend />
-                <Bar dataKey="pix" stackId="a" fill="hsl(var(--chart-1))" name="Pix" />
-                <Bar dataKey="credit" stackId="a" fill="hsl(var(--chart-2))" name="Crédito" />
-                <Bar dataKey="debit" stackId="a" fill="hsl(var(--chart-3))" name="Débito" />
-                <Bar dataKey="cash" stackId="a" fill="hsl(var(--chart-4))" name="Dinheiro" />
+                <Bar dataKey="pix" stackId="a" fill="hsl(var(--chart-1))" name={getPaymentLabel("pix")} />
+                <Bar dataKey="credit_card" stackId="a" fill="hsl(var(--chart-2))" name={getPaymentLabel("credit_card")} />
+                <Bar dataKey="debit_card" stackId="a" fill="hsl(var(--chart-3))" name={getPaymentLabel("debit_card")} />
+                <Bar dataKey="cash" stackId="a" fill="hsl(var(--chart-4))" name={getPaymentLabel("cash")} />
+                <Bar dataKey="other" stackId="a" fill="hsl(var(--chart-5))" name="Outros" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -113,9 +115,9 @@ const CashFlow = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead><TableHead className="text-right">Pix</TableHead>
-              <TableHead className="text-right">Crédito</TableHead><TableHead className="text-right">Débito</TableHead>
-              <TableHead className="text-right">Dinheiro</TableHead><TableHead className="text-right">Total Dia</TableHead>
+              <TableHead>Data</TableHead><TableHead className="text-right">PIX</TableHead>
+              <TableHead className="text-right">Cartão de Crédito</TableHead><TableHead className="text-right">Cartão de Débito</TableHead>
+              <TableHead className="text-right">Dinheiro</TableHead><TableHead className="text-right">Outros</TableHead><TableHead className="text-right">Total Dia</TableHead>
               <TableHead className="text-right">Acumulado</TableHead>
             </TableRow>
           </TableHeader>
@@ -124,9 +126,10 @@ const CashFlow = () => {
               <TableRow key={d.date}>
                 <TableCell>{d.date}</TableCell>
                 <TableCell className="text-right">{fmt(d.pix)}</TableCell>
-                <TableCell className="text-right">{fmt(d.credit)}</TableCell>
-                <TableCell className="text-right">{fmt(d.debit)}</TableCell>
+                <TableCell className="text-right">{fmt(d.credit_card)}</TableCell>
+                <TableCell className="text-right">{fmt(d.debit_card)}</TableCell>
                 <TableCell className="text-right">{fmt(d.cash)}</TableCell>
+                <TableCell className="text-right">{fmt(d.other)}</TableCell>
                 <TableCell className="text-right font-medium">{fmt(d.total)}</TableCell>
                 <TableCell className="text-right font-bold">{fmt(d.accumulated)}</TableCell>
               </TableRow>

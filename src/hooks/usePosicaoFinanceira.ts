@@ -16,6 +16,7 @@ export type UltimaVenda = {
   total: number;
   payment_method: string;
   customers: { name: string } | null;
+  customer_name: string | null;
 };
 
 export type PosicaoFinanceiraData = {
@@ -71,7 +72,7 @@ export function usePosicaoFinanceira() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from("sales")
-          .select("id, sale_number, sold_at, total, payment_method, customers(name)")
+          .select("id, sale_number, sold_at, total, payment_method, customer_name, customers(name)")
           .neq("status", "cancelled")
           .order("sold_at", { ascending: false })
           .limit(10),

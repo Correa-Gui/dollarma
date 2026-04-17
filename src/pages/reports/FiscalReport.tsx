@@ -6,16 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Printer } from "lucide-react";
 import { formatCpfCnpjPartial } from "@/lib/format";
-
-const paymentLabels: Record<string, string> = {
-  dinheiro: "Dinheiro",
-  cartao_credito: "Cartão de Crédito",
-  cartao_debito: "Cartão de Débito",
-  pix: "PIX",
-  boleto: "Boleto",
-  cheque: "Cheque",
-  crediario: "Crediário",
-};
+import { getPaymentLabel } from "@/lib/payment";
 
 const saleTypeLabel = (origin: string) => {
   if (origin === "sat") return "SAT";
@@ -53,7 +44,6 @@ const FiscalReport = () => {
 
   return (
     <div className="space-y-4">
-      {/* Filtros — ocultos na impressão */}
       <div className="print:hidden flex flex-wrap items-end gap-4">
         <div className="space-y-1">
           <Label>De</Label>
@@ -76,7 +66,6 @@ const FiscalReport = () => {
 
       {!isLoading && (
         <div id="fiscal-report-content" className="print:text-black print:bg-white">
-          {/* Cabeçalho da empresa */}
           <div className="border-b pb-4 mb-4 print:mb-6">
             <div className="font-bold text-lg uppercase tracking-wide">{settings?.store_name ?? "—"}</div>
             <div className="text-sm text-muted-foreground print:text-black">
@@ -89,7 +78,6 @@ const FiscalReport = () => {
             )}
           </div>
 
-          {/* Título do relatório */}
           <div className="mb-6">
             <h1 className="text-xl font-bold uppercase">Relatório de Notas Fiscais</h1>
             <p className="text-sm text-muted-foreground print:text-black">
@@ -99,7 +87,6 @@ const FiscalReport = () => {
             </p>
           </div>
 
-          {/* Vendas */}
           {sales.length === 0 ? (
             <p className="text-muted-foreground py-12 text-center print:text-black">
               Nenhuma venda no período selecionado.
@@ -108,25 +95,24 @@ const FiscalReport = () => {
             <div className="space-y-6">
               {sales.map((sale) => {
                 const st = statusLabel(sale.status);
+                const customerName = sale.customers?.name ?? sale.customer_name ?? null;
                 return (
                   <div key={sale.id} className="border rounded-lg overflow-hidden print:border-gray-400 print:rounded-none print-page-break">
-                    {/* Cabeçalho da venda */}
                     <div className="bg-muted/50 print:bg-gray-100 px-4 py-2 flex flex-wrap items-center gap-4 text-sm">
                       <span className="font-bold tabular-nums">#{sale.sale_number}</span>
                       <span>{fmtDate(sale.sold_at)}</span>
-                      {sale.customers ? (
+                      {customerName ? (
                         <span>
-                          {sale.customers.name}
-                          {sale.customers.cpf && ` · CPF/CNPJ: ${formatCpfCnpjPartial(sale.customers.cpf)}`}
+                          {customerName}
+                          {sale.customers?.cpf && ` · CPF/CNPJ: ${formatCpfCnpjPartial(sale.customers.cpf)}`}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground print:text-gray-500">CONSUMIDOR - A VISTA</span>
+                        <span className="text-muted-foreground print:text-gray-500">CONSUMIDOR FINAL</span>
                       )}
                       <span className={`font-bold ${st.cls}`}>{st.text}</span>
                       <span className="ml-auto font-semibold">{saleTypeLabel(sale.origin)}</span>
                     </div>
 
-                    {/* Itens */}
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left text-xs text-muted-foreground print:text-gray-500">
@@ -159,18 +145,14 @@ const FiscalReport = () => {
                       </tbody>
                     </table>
 
-                    {/* Rodapé da venda */}
                     <div className="bg-muted/30 print:bg-gray-50 px-4 py-2 flex justify-between items-center text-sm">
                       <div className="flex flex-col">
                         <span className="text-muted-foreground print:text-gray-600">
-                          Pagamento: {paymentLabels[sale.payment_method] ?? sale.payment_method}
+                          Pagamento: {getPaymentLabel(sale.payment_method)}
                         </span>
                         {Number(sale.discount_amount ?? 0) > 0 && (
                           <span className="text-amber-700 print:text-black font-medium">
                             Desconto: {fmtCurrency(Number(sale.discount_amount ?? 0))}
-                            {Number(sale.discount_percent ?? 0) > 0
-                              ? ` (${Number(sale.discount_percent ?? 0).toFixed(2)}%)`
-                              : ""}
                           </span>
                         )}
                       </div>
@@ -180,7 +162,6 @@ const FiscalReport = () => {
                 );
               })}
 
-              {/* Rodapé geral */}
               <div className="border-t pt-4 flex justify-between items-center font-semibold">
                 <span>{sales.length} venda(s) no período</span>
                 <span className="text-lg">Total Geral: {fmtCurrency(grandTotal)}</span>
