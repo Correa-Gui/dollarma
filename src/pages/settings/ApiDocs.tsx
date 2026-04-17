@@ -804,7 +804,7 @@ curl -X GET \\
     method: "POST",
     path: "/pdv-cash-register",
     title: "Fechar Caixa",
-    description: "Fecha a sessão de caixa. Envie action='close', session_id, operator_id, amount (saldo final) e opcionalmente datetime e notes. Calcula automaticamente o saldo esperado (baseado em vendas em dinheiro e sangrias) e a diferença.",
+    description: "Fecha a sessão de caixa. Envie action='close', session_id, operator_id, amount (saldo informado no fechamento) e opcionalmente datetime e notes. Calcula automaticamente o saldo esperado (baseado em vendas em dinheiro e sangrias) e a diferença.",
     headers: [
       { name: "x-pdv-token", required: true, description: "Token do terminal PDV" },
       { name: "Content-Type", required: true, description: "application/json" },

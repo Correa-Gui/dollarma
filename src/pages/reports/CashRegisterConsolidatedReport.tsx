@@ -110,6 +110,7 @@ const CashRegisterConsolidatedReport = () => {
     let opening = 0;
     let sales = 0;
     let withdrawals = 0;
+    let expected = 0;
     let closing = 0;
     let diff = 0;
 
@@ -117,11 +118,12 @@ const CashRegisterConsolidatedReport = () => {
       opening += Number(session.opening_balance ?? 0);
       sales += getSessionSalesTotal(session);
       withdrawals += getSessionWithdrawalsTotal(session);
+      expected += Number(session.expected_balance ?? 0);
       closing += Number(session.closing_balance ?? 0);
       diff += Number(session.difference ?? 0);
     });
 
-    return { opening, sales, withdrawals, closing, diff, sessions: sessions.length };
+    return { opening, sales, withdrawals, expected, closing, diff, sessions: sessions.length };
   }, [sessions]);
 
   const periodLabel = `${new Date(dateFrom + "T00:00:00").toLocaleDateString("pt-BR")} a ${new Date(dateTo + "T00:00:00").toLocaleDateString("pt-BR")}`;
@@ -179,8 +181,8 @@ const CashRegisterConsolidatedReport = () => {
           </Card>
           <Card className="border-white/10 bg-white/5 text-white shadow-xl backdrop-blur print:border-slate-200 print:bg-white print:text-black">
             <CardContent className="p-4">
-              <p className="text-xs text-slate-300 print:text-slate-500">Diferença</p>
-              <p className={`mt-1 text-2xl font-bold ${summary.diff < 0 ? "text-rose-300 print:text-rose-700" : "text-emerald-300 print:text-emerald-700"}`}>{fmt(summary.diff)}</p>
+              <p className="text-xs text-slate-300 print:text-slate-500">Saldo esperado</p>
+              <p className="mt-1 text-2xl font-bold text-sky-300 print:text-sky-700">{fmt(summary.expected)}</p>
             </CardContent>
           </Card>
         </div>
@@ -243,20 +245,24 @@ const CashRegisterConsolidatedReport = () => {
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="text-slate-300 print:text-slate-500">Terminal</TableHead>
-                        <TableHead className="text-slate-300 print:text-slate-500">Saldo inicial</TableHead>
-                        <TableHead className="text-slate-300 print:text-slate-500">Vendas</TableHead>
-                        <TableHead className="text-slate-300 print:text-slate-500">Sangrias</TableHead>
-                        <TableHead className="text-slate-300 print:text-slate-500">Diferença</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sessions.map((session) => (
+                      <TableHead className="text-slate-300 print:text-slate-500">Terminal</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Saldo inicial</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Vendas</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Sangrias</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Saldo esperado</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Saldo informado</TableHead>
+                      <TableHead className="text-slate-300 print:text-slate-500">Diferença</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessions.map((session) => (
                         <TableRow key={session.id} className="border-white/10 hover:bg-white/5 print:border-slate-200">
                           <TableCell className="text-slate-200 print:text-black">{terminalMap[session.terminal_id] ?? "—"}</TableCell>
                           <TableCell className="text-slate-200 print:text-black">{fmt(Number(session.opening_balance ?? 0))}</TableCell>
                           <TableCell className="text-emerald-300 print:text-emerald-700">{fmt(getSessionSalesTotal(session))}</TableCell>
                           <TableCell className="text-rose-300 print:text-rose-700">{fmt(getSessionWithdrawalsTotal(session))}</TableCell>
+                          <TableCell className="text-slate-200 print:text-black">{fmt(Number(session.expected_balance ?? 0))}</TableCell>
+                          <TableCell className="text-slate-200 print:text-black">{fmt(Number(session.closing_balance ?? 0))}</TableCell>
                           <TableCell className={Number(session.difference ?? 0) < 0 ? "text-rose-300 print:text-rose-700" : "text-emerald-300 print:text-emerald-700"}>
                             {fmt(Number(session.difference ?? 0))}
                           </TableCell>

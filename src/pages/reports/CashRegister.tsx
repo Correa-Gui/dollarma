@@ -105,28 +105,30 @@ const CashRegister = () => {
   const timeline = useMemo(() => (selectedSession ? buildTimeline(selectedSession) : []), [selectedSession]);
 
   const kpis = useMemo(() => {
-    let openCount = 0, closedCount = 0, totalOpening = 0, totalClosing = 0, totalDiff = 0, totalSales = 0;
+    let openCount = 0, closedCount = 0, totalOpening = 0, totalExpected = 0, totalClosing = 0, totalDiff = 0, totalSales = 0;
     sessions.forEach((s) => {
       if (s.status === "open") openCount++;
       else closedCount++;
       totalOpening += Number(s.opening_balance ?? 0);
+      totalExpected += Number(s.expected_balance ?? 0);
       totalClosing += Number(s.closing_balance ?? 0);
       totalDiff += Number(s.difference ?? 0);
       totalSales += getSessionSalesTotal(s);
     });
 
-    return { openCount, closedCount, totalOpening, totalClosing, totalDiff, totalSales, total: sessions.length };
+    return { openCount, closedCount, totalOpening, totalExpected, totalClosing, totalDiff, totalSales, total: sessions.length };
   }, [sessions]);
 
   const chartData = useMemo(() => {
-    const map: Record<string, { terminal: string; sessions: number; opening: number; closing: number; vendas: number }> = {};
+    const map: Record<string, { terminal: string; sessions: number; opening: number; expected: number; closing: number; vendas: number }> = {};
     sessions.forEach((s) => {
       const name = terminalMap[s.terminal_id] ?? "Desconhecido";
       if (!map[s.terminal_id]) {
-        map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, closing: 0, vendas: 0 };
+        map[s.terminal_id] = { terminal: name, sessions: 0, opening: 0, expected: 0, closing: 0, vendas: 0 };
       }
       map[s.terminal_id].sessions++;
       map[s.terminal_id].opening += Number(s.opening_balance ?? 0);
+      map[s.terminal_id].expected += Number(s.expected_balance ?? 0);
       map[s.terminal_id].closing += Number(s.closing_balance ?? 0);
       map[s.terminal_id].vendas += getSessionSalesTotal(s);
     });
@@ -147,9 +149,9 @@ const CashRegister = () => {
   }, [timeline]);
 
   const exportCSV = () => {
-    const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Total Vendas,Saldo Final,Diferença,Status\n";
+    const header = "Terminal,Abertura,Fechamento,Saldo Inicial,Total Vendas,Saldo Esperado,Saldo Informado,Diferença,Status\n";
     const rows = sessions.map((s) =>
-      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${getSessionSalesTotal(s)},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`,
+      `${terminalMap[s.terminal_id] ?? s.terminal_id},${fmtDate(s.opened_at)},${s.closed_at ? fmtDate(s.closed_at) : "-"},${s.opening_balance},${getSessionSalesTotal(s)},${s.expected_balance ?? "-"},${s.closing_balance ?? "-"},${s.difference ?? "-"},${s.status}`,
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const a = document.createElement("a");
@@ -218,7 +220,7 @@ const CashRegister = () => {
         <Card>
           <CardContent className="pt-4 pb-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/10"><ArrowDownCircle className="h-5 w-5 text-blue-600" /></div>
-            <div><p className="text-xs text-muted-foreground">Total Fechamento</p><p className="text-xl font-bold">{fmt(kpis.totalClosing)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Saldo esperado</p><p className="text-xl font-bold">{fmt(kpis.totalExpected)}</p></div>
           </CardContent>
         </Card>
         <Card>
@@ -273,21 +275,22 @@ const CashRegister = () => {
       </div>
 
       <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Terminal</TableHead>
-              <TableHead>Abertura</TableHead>
-              <TableHead>Fechamento</TableHead>
-              <TableHead className="text-right">Saldo Inicial</TableHead>
-              <TableHead className="text-right">Vendas</TableHead>
-              <TableHead className="text-right">Sangrias</TableHead>
-              <TableHead className="text-right">Saldo Final</TableHead>
-              <TableHead className="text-right">Diferença</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-10"></TableHead>
-            </TableRow>
-          </TableHeader>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Terminal</TableHead>
+                    <TableHead>Abertura</TableHead>
+                    <TableHead>Fechamento</TableHead>
+                    <TableHead className="text-right">Saldo Inicial</TableHead>
+                    <TableHead className="text-right">Vendas</TableHead>
+                    <TableHead className="text-right">Sangrias</TableHead>
+                    <TableHead className="text-right">Saldo esperado</TableHead>
+                    <TableHead className="text-right">Saldo informado</TableHead>
+                    <TableHead className="text-right">Diferença</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
           <TableBody>
             {sessions.length === 0 ? (
               <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Nenhuma sessão encontrada</TableCell></TableRow>
@@ -299,13 +302,14 @@ const CashRegister = () => {
                   <TableCell className="font-medium">{terminalMap[s.terminal_id] ?? "—"}</TableCell>
                   <TableCell>{fmtDate(s.opened_at)}</TableCell>
                   <TableCell>{s.closed_at ? fmtDate(s.closed_at) : "—"}</TableCell>
-                  <TableCell className="text-right">{fmt(Number(s.opening_balance))}</TableCell>
-                  <TableCell className="text-right text-emerald-600 font-medium">{fmt(salesTotal)}</TableCell>
-                  <TableCell className="text-right text-red-600 font-medium">{withdrawalsTotal > 0 ? `- ${fmt(withdrawalsTotal)}` : fmt(0)}</TableCell>
-                  <TableCell className="text-right">{s.closing_balance != null ? fmt(Number(s.closing_balance)) : "—"}</TableCell>
-                  <TableCell className={`text-right font-medium ${Number(s.difference ?? 0) < 0 ? "text-red-600" : ""}`}>
-                    {s.difference != null ? fmt(Number(s.difference)) : "—"}
-                  </TableCell>
+                      <TableCell className="text-right">{fmt(Number(s.opening_balance))}</TableCell>
+                      <TableCell className="text-right text-emerald-600 font-medium">{fmt(salesTotal)}</TableCell>
+                      <TableCell className="text-right text-red-600 font-medium">{withdrawalsTotal > 0 ? `- ${fmt(withdrawalsTotal)}` : fmt(0)}</TableCell>
+                      <TableCell className="text-right">{s.expected_balance != null ? fmt(Number(s.expected_balance)) : "—"}</TableCell>
+                      <TableCell className="text-right">{s.closing_balance != null ? fmt(Number(s.closing_balance)) : "—"}</TableCell>
+                      <TableCell className={`text-right font-medium ${Number(s.difference ?? 0) < 0 ? "text-red-600" : ""}`}>
+                        {s.difference != null ? fmt(Number(s.difference)) : "—"}
+                      </TableCell>
                   <TableCell>
                     <Badge variant={s.status === "open" ? "default" : "secondary"} className="text-xs">
                       {s.status === "open" ? "Aberto" : "Fechado"}
