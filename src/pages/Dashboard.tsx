@@ -1,6 +1,7 @@
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { PaymentMethodChart } from "@/components/dashboard/PaymentMethodChart";
+import { PaymentRevenueChart } from "@/components/dashboard/PaymentRevenueChart";
 
 import { StockEvolutionChart } from "@/components/dashboard/StockEvolutionChart";
 
@@ -50,6 +51,10 @@ const Dashboard = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.5 }} className="grid gap-4 grid-cols-1 lg:grid-cols-3">
         <div className="lg:col-span-2"><RevenueChart /></div>
         <PaymentMethodChart />
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.6 }}>
+        <PaymentRevenueChart />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.65 }}>
