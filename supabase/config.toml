@@ -1,12 +1,42 @@
 project_id = "loxnabrusfaezywloery"
 
+[functions.pdv-auth]
+verify_jwt = false
+
+[functions.pdv-catalog]
+verify_jwt = false
+
 [functions.pdv-cash-register]
+verify_jwt = false
+
+[functions.pdv-categories]
+verify_jwt = false
+
+[functions.pdv-customers]
+verify_jwt = false
+
+[functions.pdv-products]
+verify_jwt = false
+
+[functions.pdv-reference-data]
+verify_jwt = false
+
+[functions.pdv-refunds]
+verify_jwt = false
+
+[functions.pdv-sales]
+verify_jwt = false
+
+[functions.pdv-sales-print]
 verify_jwt = false
 
 [functions.pdv-sangria]
 verify_jwt = false
 
 [functions.pdv-store-settings]
+verify_jwt = false
+
+[functions.pdv-suppliers]
 verify_jwt = false
 
 [functions.admin-users]
