@@ -150,6 +150,45 @@ export function usePaymentMethodBreakdown() {
   });
 }
 
+export function usePaymentMethodRevenue() {
+  return useQuery({
+    queryKey: ["dashboard-payment-revenue"],
+    queryFn: async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+
+      const { data } = await supabase
+        .from("sales")
+        .select("payment_method, total")
+        .eq("status", "completed")
+        .gte("sold_at", since.toISOString());
+
+      const totals: Record<string, { value: number; count: number }> = {};
+      data?.forEach((s) => {
+        const key = getPaymentBucketKey(s.payment_method);
+        if (!totals[key]) totals[key] = { value: 0, count: 0 };
+        totals[key].value += Number(s.total);
+        totals[key].count++;
+      });
+
+      const colors = [
+        "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))",
+        "hsl(var(--chart-4))", "hsl(var(--chart-5))",
+      ];
+
+      return Object.entries(totals)
+        .sort((a, b) => b[1].value - a[1].value)
+        .map(([key, v], i) => ({
+          name: getPaymentLabel(key),
+          value: Math.round(v.value * 100) / 100,
+          count: v.count,
+          color: colors[i % colors.length],
+        }));
+    },
+    refetchInterval: 60000,
+  });
+}
+
 export function useTopProductsDashboard() {
   return useQuery({
     queryKey: ["dashboard-top-products"],
